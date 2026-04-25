@@ -108,11 +108,31 @@ The complete game design is documented in the [`specification/`](specification/)
 
 ## Getting Started
 
-Read the specification in order:
-1. [`01_GAME_OVERVIEW.md`](specification/01_GAME_OVERVIEW.md) for concept
-2. [`02_GAME_RULES_REFERENCE.md`](specification/02_GAME_RULES_REFERENCE.md) for all mechanics
-3. [`03_TURN_STRUCTURE.md`](specification/03_TURN_STRUCTURE.md) for game flow
-4. [`APPENDIX_A_EXAMPLES.md`](specification/APPENDIX_A_EXAMPLES.md) for concrete scenarios
+1.  **Clone and Install**:
+    ```bash
+    git clone https://github.com/Kr0issant/communism-optimizer-rl.git
+    cd communism-optimizer-rl
+    uv sync --extra dev --extra viz --extra training
+    ```
+
+2.  **Run Benchmarks**:
+    Compare different parliamentary strategies (Greedy, Conservative, Optimal):
+    ```bash
+    uv run python scripts/benchmark_baselines.py --adapter conservative --episodes 5
+    ```
+
+3.  **Visualize Reward Landscape**:
+    Verify how the RL reward function scores different budget allocations:
+    ```bash
+    uv run python scripts/benchmark_rewards.py
+    ```
+
+4.  **Test LLM Ministers**:
+    Run a live inference test with a model from Hugging Face:
+    ```bash
+    # Ensure HF_TOKEN and HF_MODEL_ID are in your .env
+    uv run python scripts/llm_test_run.py
+    ```
 
 ## Development
 
@@ -121,11 +141,9 @@ This project uses `uv` and top-level Python packages (`core`, `agents`, `schemas
 ```bash
 uv sync --extra dev
 uv run pytest
-uv run python -m evaluation.benchmark_policies --seeds 1,2,3 --max-rounds 3
-uv run --extra viz python -m evaluation.benchmark_policies --seeds 1,2,3 --max-rounds 3 --plot
 ```
 
-Core game rules live in the engine layer; policy adapters consume observations and emit structured actions only. The benchmark runs the random, greedy, equal-split, conservative, and optimal-zone baselines against the same in-process `NationGame` seeds, writes `assets/results/benchmark_summary.json`, and saves plot PNGs under `assets/results/` when `--plot` is enabled. Central telemetry writes JSONL rollout records that can be reused for plots, evaluation, and training datasets.
+The benchmark scripts provide a quick way to validate changes to the engine or reward functions. `scripts/benchmark_baselines.py` runs rule-based policies against shared seeds to track treasury and population survival. `scripts/benchmark_rewards.py` generates a visualization of the RL training signal in `assets/results/reward_landscape.png`.
 
 ### Run the Server / Space
 
@@ -190,26 +208,21 @@ uv run --extra training python training/train_grpo.py --smoke \
 
 ### Before-vs-after evidence
 
-The benchmark CLI runs the trained LoRA, the untrained base model, and the rule-based baselines against shared seeds:
-
-```bash
-uv run --extra training --extra viz python -m evaluation.benchmark_policies \
-    --seeds 1,2,3,4,5,6,7,8,9,10 --max-rounds 12 \
-    --include-llm --plot
-```
-
-Outputs land in `assets/results/`:
+The benchmark CLI runs the trained LoRA, the untrained base model, and the rule-based baselines against shared seeds.
 
 | File | Content |
 |------|---------|
 | `policy_comparison.png` | Mean episode return per policy, with the trained LoRA highlighted |
 | `survival_rounds.png` | Distribution of rounds survived per policy across all seeds |
-| `baseline_mean_episode_return.png` | Per-baseline mean return (rule-based only) |
-| `baseline_survival_rounds.png` | Per-baseline survival (rule-based only) |
+| `reward_landscape.png` | Visualization of the RL training signal (Efficiency vs Reward) |
 | `benchmark_summary.json` | Raw per-episode metrics for every policy |
 
+#### Policy Performance
 ![Policy comparison](assets/results/policy_comparison.png)
 ![Survival distribution](assets/results/survival_rounds.png)
+
+#### Reward Landscape
+![Reward Landscape](assets/results/reward_landscape.png)
 
 ## Hackathon Context
 
