@@ -32,9 +32,22 @@ the training curve directly.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+
+# Debug: show where we are and what we see
+print(f"DEBUG: CWD={os.getcwd()}")
+print(f"DEBUG: Files in CWD={os.listdir('.')}")
+print(f"DEBUG: __file__={__file__}")
+
+# Ensure project root is in sys.path for HF Jobs
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.append(str(project_root))
+print(f"DEBUG: sys.path={sys.path}")
 
 
 DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"

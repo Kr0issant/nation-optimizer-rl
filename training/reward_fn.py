@@ -135,7 +135,8 @@ def _piecewise_revenue_factor_for_amount(
     critical = float(sector["critical"])
     demand = float(sector["demand"])
     surplus = float(sector["surplus"])
-    wastage = surplus * 2.0
+    # Match core.config.WASTAGE_RATIO = 2.5
+    wastage = demand * 2.5
     rf = _revenue_factor(
         allocation=float(amount),
         critical=critical,
