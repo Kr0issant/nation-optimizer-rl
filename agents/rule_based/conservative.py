@@ -34,11 +34,15 @@ class ConservativeAdapter(PolicyAdapter):
             )
 
         if ActionType.VOTE.value in valid_action_set and observation.proposals:
-            return VoteAction(
-                type=ActionType.VOTE,
-                proposal_id=observation.proposals[0].proposal_id,
-                vote=VoteChoice.YES,
-            )
+            # Find a proposal we haven't voted on yet (and isn't our own)
+            for proposal in observation.proposals:
+                is_self_proposal = (agent_id == proposal.agent_id or agent_id == proposal.department)
+                if proposal.status == "pending" and agent_id not in proposal.votes and not is_self_proposal:
+                    return VoteAction(
+                        type=ActionType.VOTE,
+                        proposal_id=proposal.proposal_id,
+                        vote=VoteChoice.YES,
+                    )
 
         if ActionType.DEBATE.value in valid_action_set:
             return DebateAction(

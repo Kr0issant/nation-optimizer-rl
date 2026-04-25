@@ -94,6 +94,7 @@ def run_episode(
     round_num = 1
 
     while not done and step_count < max_steps:
+        prev_obs = obs
         phase = obs.phase
         valid_actions = obs.valid_actions
 
@@ -164,14 +165,16 @@ def run_episode(
             # (Though env.step handles system phases automatically)
             break
 
-        if not done:
+        # If round changed, print summary of the round that just ended
+        if not done and obs.round > prev_obs.round:
+            print(f"\n--- ROUND {prev_obs.round} SUMMARY ---")
+            print(f"  Final Treasury: {obs.treasury:.2f} | Population: {obs.population}")
+            print(f"  Requests from Round {prev_obs.round}:")
+            for p in prev_obs.proposals:
+                print(f"    - {p.department}: ${p.amount:.2f}")
+            print(f"  Round Reward: {reward:.4f}")
+            print("---------------------------\n")
             round_num = obs.round
-
-        else:
-            # System phase or unexpected state — try to advance
-            obs, reward, done, truncated, info = env._run_system_phases(departments[0])
-            total_reward += reward
-            step_count += 1
 
     return {
         "seed": seed,

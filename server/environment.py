@@ -18,6 +18,8 @@ from server.models import (
     OwnDepartmentModel,
 )
 
+import numpy as np
+
 # Maximum retry attempts for rejected proposals before fallback
 MAX_PROPOSAL_RETRIES = 2
 
@@ -55,42 +57,23 @@ class NationEnvironment(Environment):
         self, seed: Optional[int] = None, **kwargs
     ) -> tuple[ParliamentaryObservation, dict]:
         """
-        Executes one step in the environment.
-        Applies the Softmax Boundary to map continuous bids to allocations.
+        Reset the environment. Phase 1 (event revelation) runs automatically.
+        Returns observation ready for Phase 2 (debate).
         """
-        # The Softmax Boundary
-        raw_bids = np.array(action.bids)
-        
-        # Subtract max for numerical stability before exp
-        raw_bids_stable = raw_bids - np.max(raw_bids)
-        exp_bids = np.exp(raw_bids_stable)
-        percentages = exp_bids / np.sum(exp_bids)
+        super().reset(seed=seed)
+        if seed is not None:
+            self.game = NationGame(seed=seed)
+        else:
+            self.game.reset()
 
-        # Retrieve the current treasury from the game's internal state
-        # Subtract a tiny epsilon to ensure floating point math during sum() doesn't exceed the balance
-        treasury = self.game.state["treasury"] - 1e-6
+        self._retry_count = 0
+        self._round_reward = 0.0
 
-        # Calculate exact dollar allocations, avoiding floating point overflow
-        allocations_dict = {}
-        allocated = 0.0
-        for i, sector in enumerate(self.sectors):
-            if i == len(self.sectors) - 1:
-                allocations_dict[sector] = float(treasury - allocated)
-            else:
-                amt = float(percentages[i] * treasury)
-                allocations_dict[sector] = amt
-                allocated += amt
+        # Phase 1 already ran inside game.reset() → _start_round()
+        # Engine starts in Phase 1. We need to advance to Phase 2 for debate.
+        self.game.force_advance_phase()
 
-        # Step the core deterministic engine
-        result = self.game.step(allocations_dict)
-
-        # Convert result back to OpenEnv format
-        state = self._get_state(result.to_dict())
-        reward = result.reward.total
-        
-        # Gym/OpenEnv standard: (obs, reward, terminated, truncated, info)
-        terminated = result.done
-        truncated = False
+        obs = self._build_observation(agent_id=self.departments[0])
         info = {
             "episode_started": True,
             "round": self.game.round,
@@ -153,6 +136,7 @@ class NationEnvironment(Environment):
         Returns the final observation + reward for this round.
         """
         # Step through system phases until we reach next round's agent phase or done
+        result = None
         while not self.game.done and self.game.phase in (
             Phase.BUDGET_EXECUTION,
             Phase.CONSUMPTION_AND_EVENT_IMPACT,
@@ -162,8 +146,9 @@ class NationEnvironment(Environment):
         ):
             result = self.game.step(None)
 
-        # Capture the round reward
-        self._round_reward = result.reward.total
+        # Capture the round reward if available
+        if result:
+            self._round_reward = result.reward.total
 
         if self.game.done:
             obs = self._build_observation(agent_id=last_agent_id)

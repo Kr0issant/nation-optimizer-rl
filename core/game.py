@@ -649,7 +649,7 @@ class NationGame:
                     if len(p.votes) < required_votes:
                         return
                 # If we reach here, all pending proposals are fully voted.
-                # Advance to Phase 5.
+                self._tally_votes()
             else:
                 # No proposals to vote on? Advance.
                 pass
