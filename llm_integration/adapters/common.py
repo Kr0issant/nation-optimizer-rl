@@ -89,18 +89,11 @@ def parse_allowed_action(
 
 
 def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> Action:
-<<<<<<< HEAD
     """Return the least harmful valid action for the current phase.
 
-    Priority: propose a budget (keeps the game alive) > vote YES on pending
-    proposals > debate > abstain > finish debate.  Abstaining during the
-    proposal phase starves every sector and triggers critical failure, so
-    ``PROPOSE_BUDGET`` must come first.
+    Priority: propose a budget (keeps the game alive) > vote YES on the
+    target proposal > debate > finish debate.
     """
-=======
-    """Return the least invasive valid action for the current phase."""
-        
->>>>>>> f4a8456d1ed3b821152bf5374a478629e1ce1697
     if ActionType.PROPOSE_BUDGET.value in valid_actions:
         dept_name = (
             observation.own_department.name
@@ -117,12 +110,26 @@ def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> A
         )
 
     if ActionType.VOTE.value in valid_actions:
-        # Prioritize the target_proposal_id from the environment
         target_id = getattr(observation, "target_proposal_id", None)
         if not target_id:
-            # Fallback to the first pending proposal if target is missing
-            pending_ids = [p.proposal_id for p in observation.proposals if p.status == "pending"]
-            target_id = pending_ids[0] if pending_ids else "unknown_id"
+            dept = (
+                observation.own_department.name
+                if observation.own_department
+                else ""
+            )
+            for p in observation.proposals:
+                owner = getattr(p, "agent_id", None) or p.department
+                if (
+                    p.status == "pending"
+                    and p.department != dept
+                    and owner != dept
+                    and dept not in (p.votes or {})
+                ):
+                    target_id = p.proposal_id
+                    break
+            if not target_id:
+                pending = [p for p in observation.proposals if p.status == "pending"]
+                target_id = pending[0].proposal_id if pending else "unknown_id"
         return VoteAction(
             type=ActionType.VOTE,
             proposal_id=target_id,
@@ -131,9 +138,6 @@ def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> A
 
     if ActionType.DEBATE.value in valid_actions:
         return DebateAction(type=ActionType.DEBATE, message=SAFE_FALLBACK_DEBATE)
-
-    if ActionType.ABSTAIN_FROM_PROPOSAL.value in valid_actions:
-        return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
 
     if ActionType.FINISH_DEBATE.value in valid_actions:
         return FinishDebateAction(type=ActionType.FINISH_DEBATE, reason="Automatic timeout fallback.")

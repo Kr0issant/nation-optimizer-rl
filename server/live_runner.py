@@ -607,6 +607,7 @@ def parliamentary_obs_to_dataclass(
         proposals=proposals,
         votes=votes,
         debate_messages=debate,
+        target_proposal_id=getattr(obs, "target_proposal_id", None),
         termination=dict(obs.termination or {}),
     )
 

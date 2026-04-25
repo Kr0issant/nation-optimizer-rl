@@ -30,17 +30,19 @@ PUBLIC_SECTOR_FIELDS = ("critical", "demand", "surplus")
 
 def build_public_observation(observation: Any) -> dict[str, Any]:
     """Builds a public-facing observation for ministers."""
-    # Handle both schemas.observations.Observation and server.models.ParliamentaryObservation
-    phase_str = getattr(observation, "phase_name", getattr(getattr(observation, "phase", None), "name", "UNKNOWN"))
-    
-    # Determine which proposals to show
+    phase_str = getattr(
+        observation,
+        "phase_name",
+        getattr(getattr(observation, "phase", None), "name", "UNKNOWN"),
+    )
+
     target_id = getattr(observation, "target_proposal_id", None)
-    all_proposals = [proposal.model_dump() for proposal in observation.proposals]
-    
-    # If in VOTING phase with a target, filter the list to only show that proposal
-    # This prevents the LLM from getting distracted by other IDs
+    all_proposals = [_to_dict(p) for p in observation.proposals]
+
     if phase_str == "VOTING" and target_id:
-        visible_proposals = [p for p in all_proposals if p["proposal_id"] == target_id]
+        visible_proposals = [
+            p for p in all_proposals if p.get("proposal_id") == target_id
+        ]
     else:
         visible_proposals = all_proposals
 
@@ -50,9 +52,9 @@ def build_public_observation(observation: Any) -> dict[str, Any]:
         "treasury": observation.treasury,
         "event_ledger": [_sanitize_event(event) for event in observation.event_ledger],
         "proposals": visible_proposals,
-        "votes": [vote.model_dump() for vote in observation.votes],
+        "votes": [_to_dict(v) for v in observation.votes],
         "debate_messages": list(observation.debate_messages),
-        "own_department": observation.own_department.model_dump() if observation.own_department else None,
+        "own_department": _to_dict(observation.own_department) if observation.own_department else None,
         "target_proposal_id": target_id,
         "termination": dict(observation.termination) if observation.termination else {},
     }
