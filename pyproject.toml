@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "OpenEnv-compatible multi-agent RL environment for parliamentary resource allocation."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "openenv>=0.1.13",
+    "pydantic>=2.13.3",
+]
 
 [project.optional-dependencies]
 dev = [
