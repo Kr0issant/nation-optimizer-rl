@@ -25,8 +25,6 @@ class Treasury:
         """Subtract *amount* from balance (e.g. budget allocation)."""
         if amount < 0:
             raise ValueError("debit amount cannot be negative")
-        if amount > self.balance:
-            raise ValueError("cannot debit more than the current balance")
         self.balance -= amount
 
     def credit(self, amount: float) -> None:
@@ -45,11 +43,11 @@ class Treasury:
         return self.balance <= 0
 
     def can_debit(self, amount: float) -> bool:
-        """True when balance covers a non-negative debit amount."""
-        return amount >= 0 and self.balance >= amount
+        """True when the debit amount is valid for end-of-round settlement."""
+        return amount >= 0
 
     def can_afford(self, total_allocation: float) -> bool:
-        """True when balance covers the requested total allocation."""
+        """True when allocation can enter the round settlement flow."""
         return self.can_debit(total_allocation)
 
     # ── Snapshot ────────────────────────────────────────────────

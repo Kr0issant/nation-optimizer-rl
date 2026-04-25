@@ -554,6 +554,11 @@ class NationGame:
             self._check_standard_termination()
 
         prosperity = self.last_total_revenue / max(self.population.value, 1)
+        zone_penalty_overrides = (
+            {"over_allocated_count": 0, "under_allocated_count": 0}
+            if critical_failed
+            else {}
+        )
         self.last_reward = compute_reward(
             sectors=self.sectors,
             total_revenue=self.last_total_revenue,
@@ -561,6 +566,7 @@ class NationGame:
             productivity=self.productivity.value,
             round_num=completed_round,
             critical_failed=critical_failed,
+            **zone_penalty_overrides,
             productivity_bonus_scale=self.config.PRODUCTIVITY_BONUS_SCALE,
             survival_bonus_per_round=self.config.SURVIVAL_BONUS_PER_ROUND,
             over_alloc_penalty_val=self.config.OVER_ALLOC_PENALTY,

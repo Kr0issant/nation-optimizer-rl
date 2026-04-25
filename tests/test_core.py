@@ -145,9 +145,9 @@ def test_treasury():
     t.apply_baseline_tax()
     assert t.balance == 900
 
-    with pytest.raises(ValueError):
-        t.debit(1000)
-    assert not t.is_bankrupt()
+    t.debit(1000)
+    assert t.balance == -100
+    assert t.is_bankrupt()
     print("  ✓ Treasury operations correct")
 
 
