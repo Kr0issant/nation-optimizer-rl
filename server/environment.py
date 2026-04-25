@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from openenv_core import Environment
+from openenv.core.env_server import Environment
 
+from core.config import GameConfig
 from core.game import NationGame
 from schemas.phases import Phase, valid_action_types_for_phase
 from server.models import (
     ParliamentaryAction,
     ParliamentaryObservation,
+    NationAction,
+    NationObservation,
     NationState,
     EventModel,
     ProposalModel,
@@ -22,6 +25,7 @@ import numpy as np
 
 # Maximum retry attempts for rejected proposals before fallback
 MAX_PROPOSAL_RETRIES = 2
+DEFAULT_ENV_NAME = "nation_optimizer_rl"
 
 
 class NationEnvironment(Environment):
@@ -246,7 +250,7 @@ class NationEnvironment(Environment):
                 severity=e.get("severity", 0),
                 category=e.get("category", ""),
                 narrative=e.get("narrative", ""),
-                affected_departments=e.get("affected_departments", []),
+                affected_departments=_affected_departments(e),
                 round=e.get("round"),
                 cost=e.get("cost"),
             )
@@ -289,6 +293,7 @@ class NationEnvironment(Environment):
                 consumption=s.get("consumption"),
                 surplus=s.get("surplus"),
                 efficiency_rating=s.get("revenue_factor"),
+                treasury_surplus_returned_this_round=s.get("surplus"),
                 baseline=s.get("baseline"),
             )
 
@@ -303,6 +308,8 @@ class NationEnvironment(Environment):
             round=gs.get("round", 0),
             phase=int(gs.get("phase", 1)),
             phase_name=gs.get("phase_name", ""),
+            year=gs.get("year", 1),
+            quarter=gs.get("quarter", 1),
             treasury=gs.get("treasury", 0.0),
             population=gs.get("population", 0),
             productivity=gs.get("productivity", 1.0),
@@ -329,3 +336,78 @@ class NationEnvironment(Environment):
             "termination_reason": result.termination_reason,
             "retry_count": self._retry_count,
         }
+
+
+class NationOpenEnv(Environment):
+    """Thin OpenEnv wrapper around NationGame for whole-game smoke clients."""
+
+    SUPPORTS_CONCURRENT_SESSIONS = True
+
+    def __init__(self, config: GameConfig | None = None, seed: int | None = None) -> None:
+        super().__init__()
+        self._config = config or GameConfig.from_json()
+        self._game = NationGame(config=self._config, seed=seed)
+        self._step_count = 0
+
+    def reset(
+        self,
+        seed: int | None = None,
+        episode_id: str | None = None,
+        **kwargs: Any,
+    ) -> NationObservation:
+        del episode_id, kwargs
+        self._game = NationGame(config=self._config, seed=seed)
+        self._step_count = 0
+        return self._observation(info={"reset": True})
+
+    def step(
+        self,
+        action: NationAction,
+        timeout_s: float | None = None,
+        **kwargs: Any,
+    ) -> NationObservation:
+        del timeout_s, kwargs
+        self._step_count += 1
+        result = self._game.step(action.to_core_action())
+        return self._observation(
+            state=result.observation,
+            reward=float(result.reward.total),
+            done=result.done,
+            info=result.info,
+        )
+
+    @property
+    def state(self) -> NationState:
+        state = self._game.state()
+        return NationState(
+            step_count=self._step_count,
+            raw_game_state=state,
+            core_state=state,
+        )
+
+    def _observation(
+        self,
+        *,
+        state: dict[str, Any] | None = None,
+        reward: float | None = None,
+        done: bool | None = None,
+        info: dict[str, Any] | None = None,
+    ) -> NationObservation:
+        state = state or self._game.state()
+        return NationObservation(
+            done=self._game.done if done is None else done,
+            reward=float(self._game.last_reward.total) if reward is None else reward,
+            state=state,
+            info=info or {},
+            metadata={
+                "env_name": DEFAULT_ENV_NAME,
+                "step_count": self._step_count,
+            },
+        )
+
+
+def _affected_departments(event: dict[str, Any]) -> list[str]:
+    affected = event.get("affected_departments") or event.get("affected_sectors") or []
+    if isinstance(affected, dict):
+        return list(affected)
+    return list(affected)
