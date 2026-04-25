@@ -5,7 +5,7 @@ description = "OpenEnv-compatible multi-agent RL environment for parliamentary r
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "openenv>=0.1.13",
+    "openenv-core>=0.2.3",
     "pydantic>=2.13.3",
 ]
 
@@ -37,3 +37,8 @@ packages = ["core", "server", "schemas", "agents", "telemetry", "evaluation", "t
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

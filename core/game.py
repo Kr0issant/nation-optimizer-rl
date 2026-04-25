@@ -493,7 +493,6 @@ class NationGame:
         critical_failed = any(
             sector.is_critical_failure(self.population.value)
             for sector in self.sectors.values()
-            if sector.name in approved_departments
         )
         if critical_failed:
             self.last_total_allocation = sum(sector.allocation for sector in self.sectors.values())
@@ -605,14 +604,110 @@ class NationGame:
         else:
             self.shutdown_counter = 0
 
+    def _handle_vote(self, action: Mapping[str, Any], info: dict[str, Any]) -> None:
+        proposal_id = str(action.get("proposal_id", ""))
+        proposal = self._proposal_by_id(proposal_id)
+        agent_id = str(action.get("agent_id") or action.get("agent") or "")
+        vote = self._vote_value(action.get("vote"))
+
+        if proposal is None or proposal.status != PROPOSAL_STATUS_PENDING:
+            info["ignored_actions"].append({"action": dict(action), "reason": "proposal_not_votable"})
+            return
+
+        if agent_id == proposal.agent_id or agent_id == proposal.department:
+            info["ignored_actions"].append({"action": dict(action), "reason": "self_vote"})
+            return
+
+        if agent_id in proposal.votes:
+            info["ignored_actions"].append({"action": dict(action), "reason": "duplicate_vote"})
+            return
+
+        proposal.votes[agent_id] = vote
+        self.votes.append({"proposal_id": proposal_id, "agent_id": agent_id, "vote": vote})
+
     def _advance_phase(self) -> None:
         if self.done:
             return
+
+        if self.phase == Phase.DEBATE:
+            # Debate stays until force_advance_phase is called
+            return
+
+        if self.phase == Phase.PROPOSAL:
+            # Only advance if all departments have either submitted or abstained
+            total_active = len(self._submitted_departments) + len(self._abstained_departments)
+            if total_active < len(self.sectors):
+                return
+
+        if self.phase == Phase.VOTING:
+            # Only advance if all pending proposals have been voted on by everyone else
+            pending = [p for p in self.proposals if p.status == PROPOSAL_STATUS_PENDING]
+            if pending:
+                for p in pending:
+                    # Everyone except the proposer must vote
+                    required_votes = len(self.sectors) - 1
+                    if len(p.votes) < required_votes:
+                        return
+                # If we reach here, all pending proposals are fully voted.
+                # Advance to Phase 5.
+            else:
+                # No proposals to vote on? Advance.
+                pass
+
         if self.phase == Phase.TERMINATION_CHECK:
             self.round += 1
             self.phase = Phase.EVENT_REVELATION
             return
         self.phase = Phase(int(self.phase) + 1)
+
+    def force_advance_phase(self) -> None:
+        """Force the phase to advance (used to end Debate)."""
+        if self.done:
+            return
+        if self.phase == Phase.TERMINATION_CHECK:
+            self.round += 1
+            self.phase = Phase.EVENT_REVELATION
+        else:
+            self.phase = Phase(int(self.phase) + 1)
+
+    def reopen_proposal_phase(self, rejected_departments: list[str]) -> None:
+        """Rewind to Phase 3 for rejected departments only.
+
+        Called by the environment wrapper when the retry loop is active.
+        Keeps approved proposals intact, clears rejected ones, and allows
+        the rejected departments to re-propose.
+        """
+        # Remove rejected proposals so they can be re-submitted
+        self.proposals = [
+            p for p in self.proposals
+            if p.department not in rejected_departments
+            or p.status == "approved"
+        ]
+        # Allow rejected departments to submit again
+        for dept in rejected_departments:
+            self._submitted_departments.discard(dept)
+            self._abstained_departments.discard(dept)
+        # Clear votes (new proposals need new votes)
+        self.votes = []
+        # Rewind phase
+        self.phase = Phase.PROPOSAL
+
+    def apply_fallback_allocations(self, departments: list[str]) -> None:
+        """Auto-assign baseline demand for departments that exhausted retries.
+
+        Creates approved proposals at baseline demand for each department.
+        """
+        for dept in departments:
+            if dept in self.sectors and dept not in self._submitted_departments:
+                baseline = self.sectors[dept].baseline
+                self._new_proposal(
+                    agent_id=dept,
+                    department=dept,
+                    amount=baseline,
+                    justification="Fallback: baseline demand after retry exhaustion.",
+                    status="approved",
+                )
+                self._submitted_departments.add(dept)
 
     def _new_proposal(
         self,
