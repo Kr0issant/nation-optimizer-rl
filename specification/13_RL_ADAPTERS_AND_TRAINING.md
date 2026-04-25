@@ -111,6 +111,81 @@ Two variants are allowed:
 
 ---
 
+## Direct-Allocation Shortcut Mode
+
+The adapter contract above mirrors the full nine-phase parliamentary cycle. The engine (`core/game.py`) additionally exposes a **direct-allocation shortcut** that collapses an entire round into a single action, bypassing debate, proposals, and voting. This mode exists strictly to make the environment compatible with vectorised RL libraries that expect a fixed-shape continuous action (PPO, SAC, A2C, TD3, etc.) and to support sanity-checking the economy in isolation from negotiation dynamics.
+
+This shortcut is a deliberate **simplification of the action interface only**. It does not change the underlying economy, reward model, event system, or observation space. It does **not** train or evaluate parliamentary behaviour.
+
+### Activation
+
+`NationGame.step(action)` dispatches to direct-allocation mode when `action` is a `Mapping[str, float]` whose keys are a non-empty subset of `config.SECTOR_ORDER` and which contains **no `"type"` field**. Any other shape (single structured action dict with `type`, or a list of such dicts) is routed to the standard phase machinery.
+
+### Action Contract
+
+- Type: `dict[str, float]`, e.g. `{"Social": s, "Agriculture": a, "Health": h, "Education": e, "Defense": d, "Commerce": c}`.
+- Keys: drawn from `SECTOR_ORDER` (the six v1 departments).
+- Values: requested allocation per department, must be `>= 0`. Missing departments default to `0.0`.
+- For gym-style adapters using a `Box` action space, the canonical vector form is the ordered tuple `(amount_for_sector for sector in SECTOR_ORDER)`. Wrappers MAY clip, scale, or soft-bound this vector before passing it to the engine, but MUST preserve key order.
+- The mapping does not undergo proposal validation or voting: every entry is treated as an already-approved allocation against the current treasury. If the sum exceeds the treasury, individual sectors may still trip the critical-failure check after debit.
+
+### Round Semantics
+
+A single call to `step` performs one full round:
+
+1. Resets the engine to Phase 1 (`EVENT_REVELATION`) if it is mid-round, regenerating events if needed.
+2. Synthesises one approved proposal per department with `agent_id == department` and the supplied amount.
+3. Debits the treasury by the sum of allocations.
+4. Runs Phase 6 (consumption), Phase 7 (revenue), Phase 8 (surplus rollover + baseline tax) in order.
+5. Runs Phase 9 (termination check) and, if the episode continues, advances to the next round.
+6. Returns a `StepResult` with `info["accepted_actions"] == [{"type": "DIRECT_ALLOCATION"}]`.
+
+Critical-failure detection still applies: any sector whose allocation is below its critical threshold for the current population terminates the episode with `termination_reason == "CRITICAL_FAILURE"`. Bankruptcy, shutdown, max-rounds, and prosperity-streak terminations are unchanged.
+
+### Observation Contract
+
+The observation returned is structurally identical to the standard `StepResult.observation` defined in `08_OBSERVATION_SPACE.md`, with the following invariants specific to this mode:
+
+- `proposals` contains six synthetic approved proposals (one per department), authored by the department itself, with empty `votes` and `justification`.
+- `debate_messages` is always empty.
+- `votes` is always empty.
+- `phase` and `phase_name` reflect the post-round phase (Phase 1 of the next round, or the terminal phase if the episode ended).
+- `valid_actions` from `07_AGENT_ACTION_SPACE.md` is not meaningful here; the only valid "action" is the next allocation mapping.
+- All other public fields (treasury, population, productivity, sector-level allocation/consumption/revenue/surplus, event ledger, current events, last reward, total reward) are populated identically to the parliamentary path.
+
+### When To Use
+
+Use the direct-allocation shortcut **only** for:
+
+- Continuous-control RL baselines (PPO, SAC, A2C, TD3) where a six-dimensional `Box` action space is required.
+- Sanity-checking the economy (four-zone revenue curve, productivity, surplus rollover, baseline tax) under a known policy.
+- Generating reference upper bounds on the economic optimisation problem in isolation from negotiation.
+- Smoke-testing telemetry, reward, and termination plumbing without the cost of a full nine-phase cycle.
+
+### When NOT To Use
+
+Do **not** use this mode for:
+
+- The hackathon's headline research question on decentralised debate vs. central planning. That comparison must use the parliamentary interface (and, where appropriate, the dictator adapter from *Required Adapter Families*) so that observed differences are attributable to the negotiation protocol rather than the action interface.
+- Training or evaluating any LLM or parliamentary-LLM adapter.
+- Reporting against the baseline ranking in *Evaluation Protocol* below. Those baselines are defined over the structured `PROPOSE_BUDGET / VOTE / DEBATE / ABSTAIN_FROM_PROPOSAL` action space; direct-allocation runs are not directly comparable to them.
+
+### Reporting Requirements
+
+When publishing results obtained through this shortcut:
+
+- Label them explicitly as `direct-allocation` (or `central-planner`) runs.
+- Quote them in a separate table from the parliamentary baselines, never interleaved.
+- State that the policy did not exercise the voting, proposal, or debate protocol.
+
+### Guardrails (in addition to those in `11_GUARDRAILS.md` and the *Guardrails* section below)
+
+- Direct-allocation is the only sanctioned full-round shortcut. Do not introduce additional shortcuts that bypass proposal validation, voting, or phase ordering.
+- Direct-allocation policies still observe only public state; they receive no privileged information unless the run is explicitly an oracle benchmark.
+- Direct-allocation episodes do not satisfy the parliamentary "reward improvement" success criterion in *Success Criteria* below; a separate, clearly labelled track is required.
+
+---
+
 ## Telemetry Requirements
 
 Central logging is mandatory for evaluation and training.

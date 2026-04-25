@@ -111,6 +111,34 @@ def test_rule_based_adapters_vote_on_other_pending_proposal() -> None:
         assert action.proposal_id == "other"
 
 
+def test_rule_based_adapters_skip_proposals_they_already_voted_on() -> None:
+    observation = Observation(
+        round=1,
+        phase=Phase.VOTING,
+        treasury=900.0,
+        own_department=OwnDepartmentObservation(name="Health"),
+        proposals=(
+            ProposalObservation(
+                proposal_id="already-voted",
+                department="Defense",
+                amount=100.0,
+                votes={"Health": VoteChoice.YES.value},
+            ),
+            ProposalObservation(proposal_id="next", department="Education", amount=120.0),
+        ),
+    )
+
+    for adapter in (GreedyAdapter(), EqualSplitAdapter(), ConservativeAdapter()):
+        action = adapter.act(
+            observation=observation,
+            valid_actions={"VOTE"},
+            agent_id="Health",
+        )
+
+        assert action.type is ActionType.VOTE
+        assert action.proposal_id == "next"
+
+
 def _proposal_observation(treasury: float, department: str) -> Observation:
     return Observation(
         round=1,

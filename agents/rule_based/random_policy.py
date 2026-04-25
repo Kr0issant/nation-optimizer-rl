@@ -6,6 +6,7 @@ import random
 from collections.abc import Callable, Iterable
 
 from agents.base import PolicyAdapter
+from agents.rule_based.voting import is_vote_target
 from schemas.actions import (
     AbstainProposalAction,
     Action,
@@ -48,7 +49,7 @@ class RandomAdapter(PolicyAdapter):
             candidates.extend(
                 self._vote_action(proposal, vote)
                 for proposal in observation.proposals
-                if proposal.department != agent_id and proposal.status == "pending"
+                if is_vote_target(proposal, agent_id)
                 for vote in VoteChoice
             )
 

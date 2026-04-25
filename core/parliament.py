@@ -54,6 +54,15 @@ class DebateMessage:
 
 
 @dataclass(frozen=True, slots=True)
+class ProposalAbstention:
+    """Explicit record that a minister skipped their proposal turn."""
+
+    agent_id: str
+    department: str
+    submitted_order: int = 0
+
+
+@dataclass(frozen=True, slots=True)
 class ResolutionResult:
     """Resolved parliamentary round output for the core game engine."""
 
@@ -66,6 +75,7 @@ class ResolutionResult:
     proposals: list[Proposal]
     votes: list[VoteRecord]
     debate_messages: list[DebateMessage]
+    proposal_abstentions: list[ProposalAbstention]
 
 
 @dataclass(slots=True)
@@ -78,13 +88,20 @@ class ParliamentRoundState:
     proposals: list[Proposal] = field(default_factory=list)
     votes: list[VoteRecord] = field(default_factory=list)
     debate_messages: list[DebateMessage] = field(default_factory=list)
+    proposal_abstentions: list[ProposalAbstention] = field(default_factory=list)
     _proposal_counter: int = 0
     _vote_counter: int = 0
     _debate_counter: int = 0
+    _abstention_counter: int = 0
     _proposing_agents: set[str] = field(default_factory=set)
+    _abstaining_agents: set[str] = field(default_factory=set)
     _votes_by_proposal_agent: set[tuple[str, str]] = field(default_factory=set)
 
-    def collect_action(self, phase: Phase, action: Any) -> Proposal | VoteRecord | DebateMessage | None:
+    def collect_action(
+        self,
+        phase: Phase,
+        action: Any,
+    ) -> Proposal | VoteRecord | DebateMessage | ProposalAbstention | None:
         """Collect one structured action if it belongs to the supplied phase."""
 
         data = _action_to_mapping(action)
@@ -101,6 +118,10 @@ class ParliamentRoundState:
                 department=str(data.get("department", "")),
                 amount=data.get("amount"),
                 justification=str(data.get("justification", "")),
+            )
+        if Phase(phase) == Phase.PROPOSAL and action_type == ActionType.ABSTAIN_FROM_PROPOSAL.value:
+            return self.submit_abstention(
+                agent_id=str(data.get("agent_id") or data.get("agent") or ""),
             )
         if Phase(phase) == Phase.VOTING and action_type == ActionType.VOTE.value:
             return self.submit_vote(
@@ -122,6 +143,25 @@ class ParliamentRoundState:
         self.debate_messages.append(debate_message)
         return debate_message
 
+    def submit_abstention(self, agent_id: str) -> ProposalAbstention:
+        """Record that an agent explicitly skipped their proposal turn."""
+
+        department = self.agent_departments.get(agent_id)
+        if department is None:
+            raise ValueError("unknown_agent")
+        if agent_id in self._proposing_agents or agent_id in self._abstaining_agents:
+            raise ValueError("duplicate_abstention")
+
+        self._abstention_counter += 1
+        abstention = ProposalAbstention(
+            agent_id=agent_id,
+            department=department,
+            submitted_order=self._abstention_counter,
+        )
+        self.proposal_abstentions.append(abstention)
+        self._abstaining_agents.add(agent_id)
+        return abstention
+
     def submit_proposal(
         self,
         agent_id: str,
@@ -131,7 +171,7 @@ class ParliamentRoundState:
     ) -> Proposal:
         """Validate and record a proposal for the agent's assigned department."""
 
-        if agent_id in self._proposing_agents:
+        if agent_id in self._proposing_agents or agent_id in self._abstaining_agents:
             raise ValueError("duplicate_proposal")
         if self.agent_departments.get(agent_id) != department:
             raise ValueError("wrong_department")
@@ -159,6 +199,8 @@ class ParliamentRoundState:
         proposal = self._proposal_by_id(proposal_id)
         if proposal is None:
             raise ValueError("proposal_not_found")
+        if agent_id not in self.agent_departments:
+            raise ValueError("unknown_agent")
         if agent_id == proposal.agent_id:
             raise ValueError("self_vote")
 
@@ -216,6 +258,7 @@ class ParliamentRoundState:
             proposals=list(self.proposals),
             votes=list(self.votes),
             debate_messages=list(self.debate_messages),
+            proposal_abstentions=list(self.proposal_abstentions),
         )
 
     def _proposal_by_id(self, proposal_id: str) -> Proposal | None:

@@ -127,7 +127,15 @@ uv run --extra viz python -m evaluation.benchmark_policies --seeds 1,2,3 --max-r
 
 Core game rules live in the engine layer; policy adapters consume observations and emit structured actions only. The benchmark runs the random, greedy, equal-split, conservative, and optimal-zone baselines against the same in-process `NationGame` seeds, writes `assets/results/benchmark_summary.json`, and saves plot PNGs under `assets/results/` when `--plot` is enabled. Central telemetry writes JSONL rollout records that can be reused for plots, evaluation, and training datasets.
 
-## Hackathon context
+### LLM adapters
+
+`agents.llm.ParliamentaryLLMAdapter` runs one model-backed minister per acting agent. It builds prompts from legal public observation fields, asks for exactly one JSON action, parses through the strict action parser, and logs each call as `LLM_CALL` telemetry with prompt, completion, parse outcome, parsed or fallback action, and token counts when the client reports them.
+
+`agents.llm.DictatorLLMAdapter` uses a single central-planner prompt while preserving the same one-action adapter boundary. Because the current environment API validates per-agent actions, its `act_for_agents` shim calls the model one agent at a time instead of bypassing parliament or changing collective reward math. The default path is non-oracle; `oracle=True` is only for explicitly gated research comparisons.
+
+Tests and CI should use mock `TextGenerationClient` implementations, so no network or `HF_TOKEN` is required. For live inference, install `huggingface_hub`, set `HF_TOKEN` and `HF_MODEL_ID`, and construct `HuggingFaceTextGenerationClient`. Training and fine-tuning are separate from these inference adapters and belong to Mega 4 under `training/`.
+
+## Hackathon Context
 
 This project targets the **OpenEnv Hackathon** (India 2026) expectations described in [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) (themes, judging weights, and **minimum submission** requirements). In short:
 

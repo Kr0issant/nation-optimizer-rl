@@ -98,11 +98,19 @@ def run_episode(
     adapter.reset()
     collector = MetricsCollector()
     last_recorded_reward = 0.0
+    step_count = 0
+    max_phase_steps = max(config.MAX_ROUNDS * 100, 100)
 
     while not game.done:
+        step_count += 1
+        if step_count > max_phase_steps:
+            raise RuntimeError(f"Benchmark episode did not terminate: {episode_id}")
+
         phase_before_step = game.phase
         actions = _actions_for_phase(game, adapter)
         result = game.step(actions)
+        if phase_before_step is Phase.DEBATE and game.phase is Phase.DEBATE:
+            game.force_advance_phase()
 
         _record_action_outcomes(collector, result.info)
         _record_phase_metrics(collector, game, phase_before_step)
@@ -183,6 +191,8 @@ def _observation_for_agent(state: dict[str, Any], agent_id: str) -> Observation:
                 department=proposal["department"],
                 amount=proposal["amount"],
                 status=proposal["status"],
+                agent_id=proposal.get("agent_id"),
+                votes=dict(proposal.get("votes", {})),
             )
             for proposal in state["proposals"]
         ),

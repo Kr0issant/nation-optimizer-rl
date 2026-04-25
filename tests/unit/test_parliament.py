@@ -1,6 +1,8 @@
+import math
+
 import pytest
 
-from core.parliament import ParliamentRoundState, Proposal, VoteRecord
+from core.parliament import ParliamentRoundState, Proposal, ProposalAbstention, VoteRecord
 from schemas.actions import ActionType, VoteChoice
 from schemas.phases import Phase
 
@@ -57,6 +59,19 @@ def test_negative_amount_rejected():
             department="Social",
             amount=-1.0,
             justification="Negative budget",
+        )
+
+
+@pytest.mark.parametrize("amount", [math.nan, math.inf, -math.inf, True])
+def test_non_finite_and_bool_amounts_rejected(amount):
+    state = make_state()
+
+    with pytest.raises(ValueError, match="invalid_amount"):
+        state.submit_proposal(
+            agent_id="social-minister",
+            department="Social",
+            amount=amount,
+            justification="Invalid amount",
         )
 
 
@@ -129,6 +144,40 @@ def test_duplicate_vote_rejected():
         )
 
 
+def test_unknown_voter_rejected():
+    state = make_state()
+    proposal = state.submit_proposal(
+        agent_id="social-minister",
+        department="Social",
+        amount=10.0,
+        justification="Vote target",
+    )
+
+    with pytest.raises(ValueError, match="unknown_agent"):
+        state.submit_vote(
+            agent_id="unknown-minister",
+            proposal_id=proposal.proposal_id,
+            vote=VoteChoice.YES,
+        )
+
+
+def test_invalid_vote_value_rejected():
+    state = make_state()
+    proposal = state.submit_proposal(
+        agent_id="social-minister",
+        department="Social",
+        amount=10.0,
+        justification="Vote target",
+    )
+
+    with pytest.raises(ValueError, match="invalid_vote"):
+        state.submit_vote(
+            agent_id="health-minister",
+            proposal_id=proposal.proposal_id,
+            vote="MAYBE",
+        )
+
+
 def test_yes_majority_approves():
     state = make_state()
     proposal = state.submit_proposal(
@@ -164,6 +213,23 @@ def test_tie_rejects():
     assert result.proposal_outcomes[proposal.proposal_id] == "rejected_tie"
 
 
+def test_exact_fifty_percent_yes_boundary_rejects():
+    state = make_state()
+    proposal = state.submit_proposal(
+        agent_id="social-minister",
+        department="Social",
+        amount=10.0,
+        justification="Boundary target",
+    )
+    state.submit_vote("agriculture-minister", proposal.proposal_id, VoteChoice.YES)
+    state.submit_vote("health-minister", proposal.proposal_id, VoteChoice.NO)
+
+    result = state.resolve()
+
+    assert result.allocations["Social"] == 0.0
+    assert result.proposal_outcomes[proposal.proposal_id] == "rejected_tie"
+
+
 def test_all_abstain_rejects():
     state = make_state()
     proposal = state.submit_proposal(
@@ -174,6 +240,21 @@ def test_all_abstain_rejects():
     )
     state.submit_vote("agriculture-minister", proposal.proposal_id, VoteChoice.ABSTAIN)
     state.submit_vote("health-minister", proposal.proposal_id, VoteChoice.ABSTAIN)
+
+    result = state.resolve()
+
+    assert result.allocations["Social"] == 0.0
+    assert result.proposal_outcomes[proposal.proposal_id] == "rejected_all_abstain"
+
+
+def test_zero_vote_proposal_rejects_as_all_abstain():
+    state = make_state()
+    proposal = state.submit_proposal(
+        agent_id="social-minister",
+        department="Social",
+        amount=10.0,
+        justification="No vote target",
+    )
 
     result = state.resolve()
 
@@ -283,3 +364,17 @@ def test_collect_actions_over_phases_and_resolve_to_allocations():
     assert state.debate_messages[0].message == "Health can wait."
     assert isinstance(state.proposals[0], Proposal)
     assert isinstance(state.votes[0], VoteRecord)
+
+
+def test_collect_action_routes_abstain_from_proposal():
+    state = make_state()
+
+    abstention = state.collect_action(
+        Phase.PROPOSAL,
+        {"type": ActionType.ABSTAIN_FROM_PROPOSAL, "agent_id": "health-minister"},
+    )
+
+    assert isinstance(abstention, ProposalAbstention)
+    assert abstention.agent_id == "health-minister"
+    assert abstention.department == "Health"
+    assert state.proposal_abstentions == [abstention]
