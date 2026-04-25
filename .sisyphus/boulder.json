@@ -1,0 +1,59 @@
+{
+  "active_plan": "/Users/aban/drive/Projects/communism-optimizer-rl/.sisyphus/plans/rl-parliament-spec.md",
+  "started_at": "2026-04-25T08:10:54.526Z",
+  "session_ids": [
+    "ses_23c622115fferjoG6M9ldn5pq9"
+  ],
+  "session_origins": {
+    "ses_23c622115fferjoG6M9ldn5pq9": "direct"
+  },
+  "plan_name": "rl-parliament-spec",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "**Create 01_GAME_OVERVIEW.md**",
+      "session_id": "ses_23c4db92affejf2GRCJYMEq4Au",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-04-25T08:13:57.626Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "**Create 04_ECONOMY_MODEL.md**",
+      "session_id": "ses_23c47ccaaffeN9vxu63Mknwqiy",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-04-25T08:20:26.753Z"
+    },
+    "todo:12": {
+      "task_key": "todo:12",
+      "task_label": "12",
+      "task_title": "**Create 10_SUCCESS_CRITERIA.md**",
+      "session_id": "ses_23c43e33cffeDYmyTQzzghlvWE",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-04-25T08:24:26.147Z"
+    },
+    "todo:15": {
+      "task_key": "todo:15",
+      "task_label": "15",
+      "task_title": "**Final Cross-Reference and Consistency Audit**",
+      "session_id": "ses_23c401c06ffeXHM25Q0Jvlyrek",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-25T08:33:01.563Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_23c340fb2ffePeHFHhWz6jNJAP",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-25T08:44:17.996Z"
+    }
+  }
+}
