@@ -54,48 +54,15 @@ class NationEnvironment(Environment):
     def reset(
         self, seed: Optional[int] = None, **kwargs
     ) -> tuple[ParliamentaryObservation, dict]:
-        """
-        Executes one step in the environment.
-        Applies the Softmax Boundary to map continuous bids to allocations.
-        """
-        # The Softmax Boundary
-        raw_bids = np.array(action.bids)
-        
-        # Subtract max for numerical stability before exp
-        raw_bids_stable = raw_bids - np.max(raw_bids)
-        exp_bids = np.exp(raw_bids_stable)
-        percentages = exp_bids / np.sum(exp_bids)
-
-        # Retrieve the current treasury from the game's internal state
-        # Subtract a tiny epsilon to ensure floating point math during sum() doesn't exceed the balance
-        treasury = self.game.state["treasury"] - 1e-6
-
-        # Calculate exact dollar allocations, avoiding floating point overflow
-        allocations_dict = {}
-        allocated = 0.0
-        for i, sector in enumerate(self.sectors):
-            if i == len(self.sectors) - 1:
-                allocations_dict[sector] = float(treasury - allocated)
-            else:
-                amt = float(percentages[i] * treasury)
-                allocations_dict[sector] = amt
-                allocated += amt
-
-        # Step the core deterministic engine
-        result = self.game.step(allocations_dict)
-
-        # Convert result back to OpenEnv format
-        state = self._get_state(result.to_dict())
-        reward = result.reward.total
-        
-        # Gym/OpenEnv standard: (obs, reward, terminated, truncated, info)
-        terminated = result.done
-        truncated = False
-        info = {
-            "episode_started": True,
-            "round": self.game.round,
-        }
-        return obs, info
+        """Reset the environment and return the initial observation."""
+        if seed is not None:
+            self.game = NationGame(seed=seed)
+            self.departments = list(self.game.config.SECTOR_ORDER)
+        self._retry_count = 0
+        self._round_reward = 0.0
+        self.game.reset()
+        obs = self._build_observation(agent_id=self.departments[0])
+        return obs, {}
 
     def step(
         self, action: ParliamentaryAction
@@ -130,11 +97,17 @@ class NationEnvironment(Environment):
                     agent_id=rejected[0],
                     rejected_departments=rejected,
                 )
-                return obs, 0.0, False, False, {
-                    "retry": True,
-                    "retry_count": self._retry_count,
-                    "rejected_departments": rejected,
-                }
+                return (
+                    obs,
+                    0.0,
+                    False,
+                    False,
+                    {
+                        "retry": True,
+                        "retry_count": self._retry_count,
+                        "rejected_departments": rejected,
+                    },
+                )
             elif rejected and self._retry_count >= MAX_PROPOSAL_RETRIES:
                 self.game.apply_fallback_allocations(rejected)
 
@@ -145,9 +118,9 @@ class NationEnvironment(Environment):
         obs = self._build_observation(agent_id=next_agent)
         return obs, 0.0, False, False, self._build_info(result)
 
-    def _run_system_phases(self, last_agent_id: str) -> tuple[
-        ParliamentaryObservation, float, bool, bool, dict
-    ]:
+    def _run_system_phases(
+        self, last_agent_id: str
+    ) -> tuple[ParliamentaryObservation, float, bool, bool, dict]:
         """
         Auto-advance through system phases 5-9.
         Returns the final observation + reward for this round.
@@ -190,7 +163,10 @@ class NationEnvironment(Environment):
 
         # Also include departments that abstained or never proposed
         for dept in self.departments:
-            if dept not in proposed_depts and dept not in self.game._abstained_departments:
+            if (
+                dept not in proposed_depts
+                and dept not in self.game._abstained_departments
+            ):
                 # Department never proposed — they need a proposal
                 if dept not in rejected:
                     rejected.append(dept)
