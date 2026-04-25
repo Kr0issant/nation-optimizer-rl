@@ -431,6 +431,8 @@ class NationGame:
             productivity=self._productivity.value,
             round_num=self._round,
             critical_failed=critical_failed,
+            over_allocated_count=0,
+            under_allocated_count=0,
             productivity_bonus_scale=cfg.PRODUCTIVITY_BONUS_SCALE,
             survival_bonus_per_round=cfg.SURVIVAL_BONUS_PER_ROUND,
             over_alloc_penalty_val=cfg.OVER_ALLOC_PENALTY,
