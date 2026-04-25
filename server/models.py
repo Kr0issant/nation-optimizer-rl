@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from typing import Any
-from pydantic import BaseModel, Field
-from openenv_core import Observation, Action, State
+
+from pydantic import BaseModel, Field, model_validator
+from openenv.core.env_server import Action, Observation, State
 
 
 # --- Supporting Models ---
@@ -51,6 +52,7 @@ class OwnDepartmentModel(BaseModel):
     consumption: float | None = None
     surplus: float | None = None
     efficiency_rating: float | None = None
+    treasury_surplus_returned_this_round: float | None = None
     baseline: float | None = None
 
 
@@ -114,6 +116,8 @@ class ParliamentaryObservation(Observation):
     round: int = 0
     phase: int = 1
     phase_name: str = "EVENT_REVELATION"
+    year: int = 1
+    quarter: int = 1
     treasury: float = 0.0
     population: int = 0
     productivity: float = 1.0
@@ -145,15 +149,46 @@ class ParliamentaryObservation(Observation):
 # --- Legacy OpenEnv Action ---
 
 
-class NationAction(BaseModel):
-    """The continuous action space for the 6 sectors (legacy OpenEnv API)."""
+class NationAction(Action):
+    """OpenEnv action envelope for direct allocation and smoke clients."""
 
-    bids: list[float] = Field(
-        ...,
+    bids: list[float] | None = Field(
+        default=None,
         min_length=6,
         max_length=6,
-        description="Continuous bids from each of the 6 sectors.",
+        description="Legacy continuous bids from each of the 6 sectors.",
     )
+    actions: dict[str, Any] | list[dict[str, Any]] | None = Field(
+        default=None,
+        description="One phase action or a list of phase actions.",
+    )
+    direct_allocations: dict[str, float] | None = Field(
+        default=None,
+        description="Full-round direct allocation shortcut keyed by department.",
+    )
+
+    @model_validator(mode="after")
+    def require_single_action_source(self) -> "NationAction":
+        sources = [
+            self.bids is not None,
+            self.actions is not None,
+            self.direct_allocations is not None,
+        ]
+        if sum(sources) != 1:
+            raise ValueError("Provide exactly one of bids, actions, or direct_allocations.")
+        return self
+
+    def to_core_action(self) -> Any:
+        if self.direct_allocations is not None:
+            return dict(self.direct_allocations)
+        return self.actions
+
+
+class NationObservation(Observation):
+    """Serializable whole-game observation for the thin OpenEnv wrapper."""
+
+    state: dict[str, Any] = Field(description="Public NationGame state snapshot.")
+    info: dict[str, Any] = Field(default_factory=dict)
 
 
 # --- OpenEnv State ---
@@ -163,3 +198,4 @@ class NationState(State):
     """Internal state for the OpenEnv environment."""
 
     raw_game_state: dict[str, Any] = Field(default_factory=dict)
+    core_state: dict[str, Any] = Field(default_factory=dict)

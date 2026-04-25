@@ -78,14 +78,20 @@ def run_phase_loop_round(game: NationGame) -> None:
     submit_safe_proposals(game)
     approve_all_pending_proposals(game)
     while game.phase != Phase.EVENT_REVELATION and not game.done:
-        game.step()
+        if game.phase == Phase.DEBATE:
+            game.force_advance_phase()
+        else:
+            game.step()
 
 
 def run_all_abstain_round(game: NationGame) -> None:
     advance_to_phase(game, Phase.PROPOSAL)
     game.step([abstain_from_proposal(department) for department in DEPARTMENTS])
     while game.phase != Phase.EVENT_REVELATION and not game.done:
-        game.step()
+        if game.phase == Phase.DEBATE:
+            game.force_advance_phase()
+        else:
+            game.step()
 
 
 def test_reset_creates_round_1_phase_1_state() -> None:
@@ -110,8 +116,11 @@ def test_phase_transitions_follow_1_through_9() -> None:
     seen.append(game.phase)
     approve_all_pending_proposals(game)
     seen.append(game.phase)
-    while game.phase != Phase.EVENT_REVELATION:
-        game.step()
+    while game.phase != Phase.EVENT_REVELATION and not game.done:
+        if game.phase == Phase.DEBATE:
+            game.force_advance_phase()
+        else:
+            game.step()
         seen.append(game.phase)
 
     assert seen[:9] == [Phase(index) for index in range(1, 10)]
@@ -211,21 +220,24 @@ def test_tie_vote_rejects_proposal() -> None:
     game = make_game()
     advance_to_phase(game, Phase.PROPOSAL)
     game.step(proposal("Health", amount=90))
+    game.step([abstain_from_proposal(d) for d in DEPARTMENTS if d != "Health"])
     health_proposal = game.proposals[0]
-    game.force_advance_phase()
 
-    game.step([
-        vote("Agriculture", health_proposal.proposal_id, VoteChoice.ABSTAIN),
-        vote("Defense", health_proposal.proposal_id, VoteChoice.YES),
-        vote("Education", health_proposal.proposal_id, VoteChoice.ABSTAIN),
-        vote("Commerce", health_proposal.proposal_id, VoteChoice.NO),
-        vote("Social", health_proposal.proposal_id, VoteChoice.ABSTAIN),
-    ])
+    game.step(
+        [
+            vote("Defense", health_proposal.proposal_id, VoteChoice.YES),
+            vote("Commerce", health_proposal.proposal_id, VoteChoice.NO),
+            vote("Social", health_proposal.proposal_id, VoteChoice.ABSTAIN),
+            vote("Agriculture", health_proposal.proposal_id, VoteChoice.YES),
+            vote("Education", health_proposal.proposal_id, VoteChoice.NO),
+        ]
+    )
     game.step()
 
     assert health_proposal.status == PROPOSAL_STATUS_REJECTED
     assert game.sectors["Health"].allocation == 0
     assert game.done
+    assert game.termination_reason == "CRITICAL_FAILURE"
 
 
 def test_approved_proposal_debits_treasury() -> None:
@@ -245,19 +257,22 @@ def test_rejected_proposal_allocates_zero() -> None:
     game = make_game()
     advance_to_phase(game, Phase.PROPOSAL)
     game.step(proposal("Health", amount=90))
+    game.step([abstain_from_proposal(d) for d in DEPARTMENTS if d != "Health"])
     health_proposal = game.proposals[0]
-    game.force_advance_phase()
-    game.step([
-        vote(department, health_proposal.proposal_id, VoteChoice.NO)
-        for department in DEPARTMENTS
-        if department != "Health"
-    ])
+    game.step(
+        [
+            vote(department, health_proposal.proposal_id, VoteChoice.NO)
+            for department in DEPARTMENTS
+            if department != "Health"
+        ]
+    )
 
     game.step()
 
     assert health_proposal.status == PROPOSAL_STATUS_REJECTED
     assert game.sectors["Health"].allocation == 0
     assert game.done
+    assert game.termination_reason == "CRITICAL_FAILURE"
 
 
 def test_abstain_from_proposal_action_is_accepted() -> None:
@@ -271,6 +286,7 @@ def test_abstain_from_proposal_action_is_accepted() -> None:
 
 
 def test_all_abstain_round_triggers_critical_failure() -> None:
+    """With no approved budgets, sectors sit at zero allocation and immediate critical ends the episode."""
     game = make_game()
 
     run_all_abstain_round(game)
@@ -282,9 +298,11 @@ def test_sequential_treasury_depletion_rejects_later_proposal() -> None:
     game = make_game()
     advance_to_phase(game, Phase.PROPOSAL)
     game.step([proposal("Social", amount=900), proposal("Health", amount=900)])
+    game.step(
+        [abstain_from_proposal(d) for d in DEPARTMENTS if d not in {"Social", "Health"}]
+    )
     social_proposal = next(item for item in game.proposals if item.department == "Social")
     health_proposal = next(item for item in game.proposals if item.department == "Health")
-    game.force_advance_phase()
 
     game.step(
         [
@@ -304,6 +322,7 @@ def test_sequential_treasury_depletion_rejects_later_proposal() -> None:
     assert health_proposal.status == PROPOSAL_STATUS_REJECTED
     assert health_proposal.rejection_reason == "exceeds_remaining_treasury"
     assert game.done
+    assert game.termination_reason == "CRITICAL_FAILURE"
 
 
 def test_critical_under_allocation_terminates_episode() -> None:
@@ -328,13 +347,15 @@ def test_critical_failure_after_revenue_round_uses_zero_current_revenue() -> Non
 
     advance_to_phase(game, Phase.PROPOSAL)
     game.step(proposal("Health", amount=1))
+    game.step([abstain_from_proposal(d) for d in DEPARTMENTS if d != "Health"])
     health_proposal = game.proposals[0]
-    game.force_advance_phase()
-    game.step([
-        vote(department, health_proposal.proposal_id)
-        for department in DEPARTMENTS
-        if department != "Health"
-    ])
+    game.step(
+        [
+            vote(department, health_proposal.proposal_id)
+            for department in DEPARTMENTS
+            if department != "Health"
+        ]
+    )
     result = game.step()
 
     assert result.done

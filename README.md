@@ -82,7 +82,7 @@ The complete game design is documented in the [`specification/`](specification/)
 | [`13_RL_ADAPTERS_AND_TRAINING.md`](specification/13_RL_ADAPTERS_AND_TRAINING.md) | Adapters, telemetry, evaluation, TRL/Unsloth pipeline |
 | [`APPENDIX_A_EXAMPLES.md`](specification/APPENDIX_A_EXAMPLES.md) | Concrete numerical examples |
 
-**Hackathon themes and judging (external minimum bar):** [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) — OpenEnv Apr ’26 themes, TRL/Unsloth requirement, Space, plots, and README expectations.
+**Hackathon themes and judging (external minimum bar):** OpenEnv Apr ’26 themes, TRL/Unsloth requirement, Space, plots, and README expectations.
 
 **Sprint plan (reconciled with the spec):** [`ImplemenationPlanRLIncluded.md`](ImplemenationPlanRLIncluded.md).
 
@@ -127,6 +127,22 @@ uv run --extra viz python -m evaluation.benchmark_policies --seeds 1,2,3 --max-r
 
 Core game rules live in the engine layer; policy adapters consume observations and emit structured actions only. The benchmark runs the random, greedy, equal-split, conservative, and optimal-zone baselines against the same in-process `NationGame` seeds, writes `assets/results/benchmark_summary.json`, and saves plot PNGs under `assets/results/` when `--plot` is enabled. Central telemetry writes JSONL rollout records that can be reused for plots, evaluation, and training datasets.
 
+### Run the Server / Space
+
+The OpenEnv-compatible server wraps `core.game.NationGame` without changing game rules. It uses `openenv-core==0.2.3`, exposes the thin whole-game wrapper at `server.app:app`, and is configured for Hugging Face Space hosting through `openenv.yaml`.
+
+```bash
+uv sync --extra dev
+uv run uvicorn server.app:app --host 0.0.0.0 --port 8000
+```
+
+For Docker or Space smoke tests:
+
+```bash
+docker build -t nation-optimizer-rl .
+docker run --rm -p 8000:8000 nation-optimizer-rl
+```
+
 ### LLM adapters
 
 `agents.llm.ParliamentaryLLMAdapter` runs one model-backed minister per acting agent. It builds prompts from legal public observation fields, asks for exactly one JSON action, parses through the strict action parser, and logs each call as `LLM_CALL` telemetry with prompt, completion, parse outcome, parsed or fallback action, and token counts when the client reports them.
@@ -137,7 +153,7 @@ Tests and CI should use mock `TextGenerationClient` implementations, so no netwo
 
 ## Hackathon Context
 
-This project targets the **OpenEnv Hackathon** (India 2026) expectations described in [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) (themes, judging weights, and **minimum submission** requirements). In short:
+This project targets the **OpenEnv Hackathon** (India 2026) expectations (themes, judging weights, and **minimum submission** requirements). In short:
 
 - **OpenEnv (latest):** build on the framework; use `Environment` / `MCPEnvironment`, Gym-style `reset` / `step` / `state`, client–server boundaries, and a valid **`openenv.yaml`** when the server is published.
 - **Training:** a **working script** using **Hugging Face TRL** or **Unsloth** (ideally Colab-runnable) that trains **against the environment**, not only a static dataset, with **evidence** (loss and reward or clear before/after behavior, plots committed as e.g. PNG in-repo).
