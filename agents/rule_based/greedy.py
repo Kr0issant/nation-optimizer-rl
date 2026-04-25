@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 
 from agents.base import PolicyAdapter
+from agents.rule_based.voting import first_vote_target
 from schemas.actions import (
     AbstainProposalAction,
     Action,
@@ -31,10 +32,11 @@ class GreedyAdapter(PolicyAdapter):
                 justification="Maximize this department's immediate allocation.",
             )
 
-        if ActionType.VOTE.value in valid_action_set and observation.proposals:
+        vote_target = first_vote_target(observation.proposals, agent_id)
+        if ActionType.VOTE.value in valid_action_set and vote_target is not None:
             return VoteAction(
                 type=ActionType.VOTE,
-                proposal_id=observation.proposals[0].proposal_id,
+                proposal_id=vote_target.proposal_id,
                 vote=VoteChoice.YES,
             )
 

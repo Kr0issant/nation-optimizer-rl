@@ -108,17 +108,11 @@ def compute_reward(
     RewardBreakdown
         Full reward breakdown.
     """
-    import math
     if prosperity is None:
         if total_revenue is None or population is None:
             raise ValueError("provide prosperity or both total_revenue and population")
-        # Fix: Genocide by Neglect. Incentivize population growth and revenue separately.
-        # base_reward = log(revenue + 1) + 0.1 * log(population + 1)
-        base_reward = math.log(total_revenue + 1) + 0.5 * math.log(population + 1)
-    else:
-        # If prosperity (rev/pop) is passed directly, we use it but log-scale it to match
-        pop_val = population if population is not None else 1
-        base_reward = math.log(prosperity * pop_val + 1) + 0.5 * math.log(pop_val + 1)
+        prosperity = total_revenue / max(population, 1)
+    base_reward = prosperity
 
     # Productivity bonus
     prod_bonus = productivity_bonus_scale * (productivity - 1.0)

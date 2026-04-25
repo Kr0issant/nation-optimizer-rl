@@ -77,9 +77,14 @@ The complete game design is documented in the [`specification/`](specification/)
 | [`08_OBSERVATION_SPACE.md`](specification/08_OBSERVATION_SPACE.md) | What agents observe |
 | [`09_REWARD_MODEL.md`](specification/09_REWARD_MODEL.md) | Prosperity/GDP reward function |
 | [`10_SUCCESS_CRITERIA.md`](specification/10_SUCCESS_CRITERIA.md) | Winning/losing conditions |
-| [`11_GUARDRAILS.md`](specification/11_GUARDRAILS.md) | Explicit exclusions |
+| [`11_GUARDRAILS.md`](specification/11_GUARDRAILS.md) | Explicit exclusions (mechanics vs hackathon deliverables) |
 | [`12_GLOSSARY.md`](specification/12_GLOSSARY.md) | Defined terms |
+| [`13_RL_ADAPTERS_AND_TRAINING.md`](specification/13_RL_ADAPTERS_AND_TRAINING.md) | Adapters, telemetry, evaluation, TRL/Unsloth pipeline |
 | [`APPENDIX_A_EXAMPLES.md`](specification/APPENDIX_A_EXAMPLES.md) | Concrete numerical examples |
+
+**Hackathon themes and judging (external minimum bar):** [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) — OpenEnv Apr ’26 themes, TRL/Unsloth requirement, Space, plots, and README expectations.
+
+**Sprint plan (reconciled with the spec):** [`ImplemenationPlanRLIncluded.md`](ImplemenationPlanRLIncluded.md).
 
 ## Key Design Decisions
 
@@ -116,10 +121,11 @@ This project uses `uv` and top-level Python packages (`core`, `agents`, `schemas
 ```bash
 uv sync --extra dev
 uv run pytest
-uv run python -m evaluation.benchmark_policies
+uv run python -m evaluation.benchmark_policies --seeds 1,2,3 --max-rounds 3
+uv run --extra viz python -m evaluation.benchmark_policies --seeds 1,2,3 --max-rounds 3 --plot
 ```
 
-Core game rules live in the engine layer; policy adapters consume observations and emit structured actions only. Central telemetry writes JSONL rollout records that can be reused for plots, evaluation, and training datasets.
+Core game rules live in the engine layer; policy adapters consume observations and emit structured actions only. The benchmark runs the random, greedy, equal-split, conservative, and optimal-zone baselines against the same in-process `NationGame` seeds, writes `assets/results/benchmark_summary.json`, and saves plot PNGs under `assets/results/` when `--plot` is enabled. Central telemetry writes JSONL rollout records that can be reused for plots, evaluation, and training datasets.
 
 ### LLM adapters
 
@@ -131,10 +137,14 @@ Tests and CI should use mock `TextGenerationClient` implementations, so no netwo
 
 ## Hackathon Context
 
-Built for a meta RL hackathon using:
-- **Meta's OpenEnv** as the RL environment framework
-- **Hugging Face** as the LLM inference provider
-- Multi-agent cooperative learning with collective reward
+This project targets the **OpenEnv Hackathon** (India 2026) expectations described in [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) (themes, judging weights, and **minimum submission** requirements). In short:
+
+- **OpenEnv (latest):** build on the framework; use `Environment` / `MCPEnvironment`, Gym-style `reset` / `step` / `state`, client–server boundaries, and a valid **`openenv.yaml`** when the server is published.
+- **Training:** a **working script** using **Hugging Face TRL** or **Unsloth** (ideally Colab-runnable) that trains **against the environment**, not only a static dataset, with **evidence** (loss and reward or clear before/after behavior, plots committed as e.g. PNG in-repo).
+- **Storytelling:** mini-blog on Hugging Face or a YouTube video **under two minutes** (or short deck); link everything from this README; host the **Space** and submit the Space URL.
+- **Judging (overview):** environment innovation, storytelling, **showing improvement in rewards** (curves, baselines), and **reward + training pipeline** coherence.
+
+**Collective reward** and mechanics guardrails are unchanged; see [`11_GUARDRAILS.md`](specification/11_GUARDRAILS.md) for how **mechanics specs (01–12)** relate to these **deliverable** requirements.
 
 ## License
 

@@ -6,10 +6,16 @@ This document defines hard constraints that MUST NOT be violated during implemen
 
 ## Scope Guardrails
 
-- **NO training algorithm specification in any document**
-  - Why: This is a specification of game mechanics and environment interface, not a training manual. PPO, A3C, REINFORCE, or any other algorithm belongs in implementation code, not specs. Hackathon teams will choose their own training approaches.
+- **Game mechanics documents (01–12) do not mandate a training algorithm**
+  - Why: Documents `01` through `12` define rules, observations, rewards, and termination so any training approach can target the same Markov game. They intentionally avoid fixing PPO vs GRPO vs SFT, hyperparameters, or model choice.
 
-- **NO prompt engineering or LLM jailbreak handling in any document**
+- **Hackathon submission requirements are defined outside 01–12**
+  - The authoritative **OpenEnv Hackathon** minimum bar (e.g. latest OpenEnv, a **working training script using Hugging Face TRL or Unsloth**, evidence of training such as loss/reward plots, Space hosting, README links) is given in `specification/PROBLEM_STATEMENT/` (see the Apr ’26 themes and judging criteria document). That is a **deliverables** contract, not a change to in-universe game rules.
+
+- **`13_RL_ADAPTERS_AND_TRAINING.md` is the in-repo training and evaluation contract**
+  - Why: It complements mechanics: adapters, telemetry, benchmarks, and the expected TRL/Unsloth-shaped pipeline without rewriting `02`–`10`. Implementations should satisfy both the mechanics specs and `13`, and meet the external hackathon checklist where the project is submitted.
+
+- **NO prompt engineering or LLM jailbreak handling in mechanics documents (01–12)**
   - Why: Prompt injection attacks, system prompt extraction, or adversarial LLM behavior are implementation concerns. The specification defines the environment interface and game rules, not how to secure language model endpoints.
 
 - **NO coalition mechanics or inter-ministry private communication**

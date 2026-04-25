@@ -74,11 +74,7 @@ class NationEnvironment(Environment):
         self.game.force_advance_phase()
 
         obs = self._build_observation(agent_id=self.departments[0])
-        info = {
-            "episode_started": True,
-            "round": self.game.round,
-        }
-        return obs, info
+        return obs, {}
 
     def step(
         self, action: ParliamentaryAction

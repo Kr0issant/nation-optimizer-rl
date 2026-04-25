@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 
 from agents.base import PolicyAdapter
+from agents.rule_based.voting import first_vote_target
 from schemas.actions import (
     AbstainProposalAction,
     Action,
@@ -33,16 +34,13 @@ class ConservativeAdapter(PolicyAdapter):
                 justification="Request baseline demand to avoid underfunding.",
             )
 
-        if ActionType.VOTE.value in valid_action_set and observation.proposals:
-            # Find a proposal we haven't voted on yet (and isn't our own)
-            for proposal in observation.proposals:
-                is_self_proposal = (agent_id == proposal.agent_id or agent_id == proposal.department)
-                if proposal.status == "pending" and agent_id not in proposal.votes and not is_self_proposal:
-                    return VoteAction(
-                        type=ActionType.VOTE,
-                        proposal_id=proposal.proposal_id,
-                        vote=VoteChoice.YES,
-                    )
+        vote_target = first_vote_target(observation.proposals, agent_id)
+        if ActionType.VOTE.value in valid_action_set and vote_target is not None:
+            return VoteAction(
+                type=ActionType.VOTE,
+                proposal_id=vote_target.proposal_id,
+                vote=VoteChoice.YES,
+            )
 
         if ActionType.DEBATE.value in valid_action_set:
             return DebateAction(
