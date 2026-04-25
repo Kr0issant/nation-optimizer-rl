@@ -2,6 +2,8 @@
 
 > A multi-agent reinforcement learning environment simulating cooperative parliamentary resource allocation. Inspired by the Marxist principle: *"From each according to his ability, to each according to his need."*
 
+![Project Poster](assets/poster.png)
+
 ## Overview
 
 This project is a **cooperative multi-agent RL environment** where LLM-powered ministers collectively manage a nation's treasury through sequential budget negotiations, voting, and debate.
