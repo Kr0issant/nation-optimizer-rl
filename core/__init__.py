@@ -20,6 +20,7 @@ from .parliament import (
     DebateMessage,
     ParliamentRoundState,
     Proposal,
+    ProposalAbstention,
     ResolutionResult,
     VoteRecord,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "StepResult",
     "ParliamentRoundState",
     "Proposal",
+    "ProposalAbstention",
     "VoteRecord",
     "DebateMessage",
     "ResolutionResult",

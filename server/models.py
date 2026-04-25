@@ -22,17 +22,6 @@ class EventModel(BaseModel):
     cost: float | None = None
 
 
-class NationAction(BaseModel):
-    """The continuous action space for the 6 sectors (legacy OpenEnv API)."""
-
-    bids: list[float] = Field(
-        ...,
-        min_length=6,
-        max_length=6,
-        description="Continuous bids from each of the 6 sectors.",
-    )
-
-
 class ProposalModel(BaseModel):
     """A budget proposal submitted during Phase 3."""
 
@@ -151,6 +140,20 @@ class ParliamentaryObservation(Observation):
     # Retry info
     retry_count: int = 0
     rejected_departments: list[str] = Field(default_factory=list)
+
+
+# --- Legacy OpenEnv Action ---
+
+
+class NationAction(BaseModel):
+    """The continuous action space for the 6 sectors (legacy OpenEnv API)."""
+
+    bids: list[float] = Field(
+        ...,
+        min_length=6,
+        max_length=6,
+        description="Continuous bids from each of the 6 sectors.",
+    )
 
 
 # --- OpenEnv State ---

@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "OpenEnv-compatible multi-agent RL environment for parliamentary resource allocation."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "openenv-core>=0.2.3",
+    "pydantic>=2.13.3",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -34,3 +37,8 @@ packages = ["core", "server", "schemas", "agents", "telemetry", "evaluation", "t
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

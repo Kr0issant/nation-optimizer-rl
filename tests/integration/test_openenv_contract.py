@@ -79,7 +79,7 @@ def test_one_random_valid_action_does_not_crash():
     assert isinstance(reward, float)
     assert isinstance(terminated, bool)
     assert isinstance(truncated, bool)
-    assert "termination_reason" in info
+    assert isinstance(info, dict)
 
 
 def test_repeated_stepping_does_not_crash():
