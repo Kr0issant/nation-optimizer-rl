@@ -64,6 +64,12 @@ def test_economy_scenario_matches_expected_values(
     assert result.total_allocation == pytest.approx(
         scenario.expected_total_allocation,
     )
+    assert result.total_consumption == pytest.approx(
+        scenario.expected_total_consumption,
+    )
+    assert result.surplus_returned == pytest.approx(
+        scenario.expected_surplus_returned,
+    )
     assert result.total_revenue == pytest.approx(
         scenario.expected_total_revenue,
     )
@@ -90,6 +96,7 @@ def test_normal_profit_zone_has_peak_revenue_without_penalties() -> None:
 
     for factor in result.revenue_factors.values():
         assert factor == pytest.approx(1.8)
+    assert result.surplus_returned == pytest.approx(237.5)
     assert result.under_allocated_count == 0
     assert result.over_allocated_count == 0
     assert not result.critical_failure
@@ -125,6 +132,7 @@ def test_wastage_round_applies_over_allocation_penalty_zone() -> None:
     result = evaluate_economy_scenario(WASTAGE)
 
     assert result.revenue_factors["Commerce"] == pytest.approx(0.7453559924999299)
+    assert result.surplus_returned == pytest.approx(150.0)
     assert result.under_allocated_count == 0
     assert result.over_allocated_count == 1
     assert not result.critical_failure

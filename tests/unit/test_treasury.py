@@ -28,11 +28,13 @@ def test_credit_increases_balance() -> None:
     assert treasury.balance == 140
 
 
-def test_overdraft_raises_value_error() -> None:
+def test_overdraft_is_allowed_until_end_of_round_bankruptcy_check() -> None:
     treasury = Treasury(balance=100)
 
-    with pytest.raises(ValueError):
-        treasury.debit(101)
+    treasury.debit(101)
+
+    assert treasury.balance == -1
+    assert treasury.is_bankrupt()
 
 
 def test_negative_debit_and_credit_raise_value_error() -> None:

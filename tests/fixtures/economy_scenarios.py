@@ -44,6 +44,8 @@ class EconomyScenario:
     expected_revenue_factors: dict[str, float | None]
     expected_revenues: dict[str, float]
     expected_total_allocation: float
+    expected_total_consumption: float
+    expected_surplus_returned: float
     expected_total_revenue: float
     expected_treasury_after_round: float
     expected_under_allocated_count: int
@@ -59,6 +61,8 @@ class EconomyEvaluation:
     revenue_factors: dict[str, float | None]
     revenues: dict[str, float]
     total_allocation: float
+    total_consumption: float
+    surplus_returned: float
     total_revenue: float
     treasury_after_round: float
     under_allocated_count: int
@@ -96,8 +100,10 @@ NORMAL_PROFIT_ZONE = EconomyScenario(
         "Commerce": 202.5,
     },
     expected_total_allocation=712.5,
+    expected_total_consumption=475.0,
+    expected_surplus_returned=237.5,
     expected_total_revenue=1282.5,
-    expected_treasury_after_round=1670.0,
+    expected_treasury_after_round=1907.5,
     expected_under_allocated_count=0,
     expected_over_allocated_count=0,
     expected_critical_failure=False,
@@ -133,6 +139,8 @@ CONSERVATIVE_DEMAND = EconomyScenario(
         "Commerce": 75.0,
     },
     expected_total_allocation=475.0,
+    expected_total_consumption=475.0,
+    expected_surplus_returned=0.0,
     expected_total_revenue=475.0,
     expected_treasury_after_round=1100.0,
     expected_under_allocated_count=0,
@@ -170,6 +178,8 @@ UNDERFUNDED_SURVIVABLE = EconomyScenario(
         "Commerce": 75.0,
     },
     expected_total_allocation=439.0,
+    expected_total_consumption=439.0,
+    expected_surplus_returned=0.0,
     expected_total_revenue=403.0,
     expected_treasury_after_round=1064.0,
     expected_under_allocated_count=1,
@@ -207,6 +217,8 @@ CRITICAL_FAILURE = EconomyScenario(
         "Commerce": 0.0,
     },
     expected_total_allocation=405.0,
+    expected_total_consumption=0.0,
+    expected_surplus_returned=0.0,
     expected_total_revenue=0.0,
     expected_treasury_after_round=1000.0,
     expected_under_allocated_count=0,
@@ -244,8 +256,10 @@ WASTAGE = EconomyScenario(
         "Commerce": 167.70509831248424,
     },
     expected_total_allocation=625.0,
+    expected_total_consumption=475.0,
+    expected_surplus_returned=150.0,
     expected_total_revenue=567.7050983124842,
-    expected_treasury_after_round=1042.7050983124842,
+    expected_treasury_after_round=1192.7050983124842,
     expected_under_allocated_count=0,
     expected_over_allocated_count=1,
     expected_critical_failure=False,
@@ -294,6 +308,8 @@ def evaluate_economy_scenario(scenario: EconomyScenario) -> EconomyEvaluation:
 
     if critical_failure:
         revenues = {sector_name: 0.0 for sector_name in SECTOR_BASELINES}
+        total_consumption = 0.0
+        surplus_returned = 0.0
         total_revenue = 0.0
         average_revenue_factor = None
         productivity_after_round = INITIAL_PRODUCTIVITY
@@ -312,6 +328,11 @@ def evaluate_economy_scenario(scenario: EconomyScenario) -> EconomyEvaluation:
             )
             revenues[sector_name] = revenue or 0.0
 
+        total_consumption = sum(
+            min(scenario.allocations[sector_name], thresholds[sector_name][1])
+            for sector_name in scenario.allocations
+        )
+        surplus_returned = total_allocation - total_consumption
         total_revenue = sum(revenues.values())
         viable_factors = [factor for factor in revenue_factors.values() if factor is not None]
         average_revenue_factor = sum(viable_factors) / len(viable_factors)
@@ -323,7 +344,7 @@ def evaluate_economy_scenario(scenario: EconomyScenario) -> EconomyEvaluation:
             INITIAL_TREASURY
             + BASELINE_TAX
             + total_revenue
-            - total_allocation
+            - total_consumption
         )
 
     return EconomyEvaluation(
@@ -331,6 +352,8 @@ def evaluate_economy_scenario(scenario: EconomyScenario) -> EconomyEvaluation:
         revenue_factors=revenue_factors,
         revenues=revenues,
         total_allocation=total_allocation,
+        total_consumption=total_consumption,
+        surplus_returned=surplus_returned,
         total_revenue=total_revenue,
         treasury_after_round=treasury_after_round,
         under_allocated_count=under_allocated_count,
