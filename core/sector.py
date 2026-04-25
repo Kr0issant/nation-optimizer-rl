@@ -223,7 +223,7 @@ class Sector:
 
         Returns the surplus amount.
         """
-        self.consumption = min(self.allocation, self.demand)
+        self.consumption = min(self.allocation, float(self.demand))
         return self.allocation - self.consumption  # surplus
 
     # ── Serialisation helpers ───────────────────────────────────
