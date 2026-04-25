@@ -9,8 +9,10 @@ from openenv_core import Observation, Action, State
 
 # --- Supporting Models ---
 
+
 class EventModel(BaseModel):
     """An event revealed during Phase 1."""
+
     name: str
     severity: int
     category: str
@@ -22,6 +24,7 @@ class EventModel(BaseModel):
 
 class ProposalModel(BaseModel):
     """A budget proposal submitted during Phase 3."""
+
     proposal_id: str
     agent_id: str
     department: str
@@ -34,6 +37,7 @@ class ProposalModel(BaseModel):
 
 class VoteModel(BaseModel):
     """A single vote cast during Phase 4."""
+
     proposal_id: str
     agent_id: str
     vote: str  # YES / NO / ABSTAIN
@@ -41,6 +45,7 @@ class VoteModel(BaseModel):
 
 class OwnDepartmentModel(BaseModel):
     """Private observation for a specific department's minister."""
+
     name: str
     allocated_budget: float | None = None
     consumption: float | None = None
@@ -50,6 +55,7 @@ class OwnDepartmentModel(BaseModel):
 
 
 # --- OpenEnv Action ---
+
 
 class ParliamentaryAction(Action):
     """
@@ -61,6 +67,7 @@ class ParliamentaryAction(Action):
       - VOTE:                   requires `proposal_id`, `vote`
       - ABSTAIN_FROM_PROPOSAL:  no extra fields needed
     """
+
     agent_id: str
     type: str  # DEBATE | PROPOSE_BUDGET | VOTE | ABSTAIN_FROM_PROPOSAL
 
@@ -95,6 +102,7 @@ class ParliamentaryAction(Action):
 
 # --- OpenEnv Observation ---
 
+
 class ParliamentaryObservation(Observation):
     """
     Full spec-compliant observation per 08_OBSERVATION_SPACE.md.
@@ -102,6 +110,7 @@ class ParliamentaryObservation(Observation):
     Includes all public information plus private `own_department` data
     for the specific agent receiving the observation.
     """
+
     round: int = 0
     phase: int = 1
     phase_name: str = "EVENT_REVELATION"
@@ -133,8 +142,24 @@ class ParliamentaryObservation(Observation):
     rejected_departments: list[str] = Field(default_factory=list)
 
 
+# --- Legacy OpenEnv Action ---
+
+
+class NationAction(BaseModel):
+    """The continuous action space for the 6 sectors (legacy OpenEnv API)."""
+
+    bids: list[float] = Field(
+        ...,
+        min_length=6,
+        max_length=6,
+        description="Continuous bids from each of the 6 sectors.",
+    )
+
+
 # --- OpenEnv State ---
+
 
 class NationState(State):
     """Internal state for the OpenEnv environment."""
+
     raw_game_state: dict[str, Any] = Field(default_factory=dict)

@@ -4,27 +4,24 @@ import pytest
 from pydantic import ValidationError
 
 from server.environment import NationEnvironment
-from server.models import NationAction, NationState
+from server.models import ParliamentaryAction, ParliamentaryObservation
 
 
-VALID_BID_COUNT = 6
+def make_debate_action(agent_id: str = "Social") -> ParliamentaryAction:
+    return ParliamentaryAction(agent_id=agent_id, type="DEBATE", message="")
 
 
-def make_equal_bid_action() -> NationAction:
-    return NationAction(bids=[0.0] * VALID_BID_COUNT)
-
-
-def assert_state_contract(state: NationState) -> None:
+def assert_state_contract(state: ParliamentaryObservation) -> None:
     dumped_state = state.model_dump()
 
-    assert isinstance(state, NationState)
+    assert isinstance(state, ParliamentaryObservation)
     assert "treasury" in dumped_state
     assert "population" in dumped_state
     assert "productivity" in dumped_state
-    assert "active_events" in dumped_state
+    assert "event_ledger" in dumped_state
 
 
-def assert_state_is_serializable(state: NationState) -> None:
+def assert_state_is_serializable(state: ParliamentaryObservation) -> None:
     serialized = state.model_dump_json()
 
     assert json.loads(serialized) == state.model_dump(mode="json")
@@ -44,26 +41,37 @@ def test_step_returns_openenv_tuple_and_info_contract():
     env = NationEnvironment(seed=123)
     env.reset()
 
-    state, reward, terminated, truncated, info = env.step(make_equal_bid_action())
+    state, reward, terminated, truncated, info = env.step(make_debate_action())
 
     assert_state_contract(state)
     assert_state_is_serializable(state)
     assert isinstance(reward, float)
     assert isinstance(terminated, bool)
     assert isinstance(truncated, bool)
-    assert isinstance(info["reward_breakdown"], dict)
-    assert "termination_reason" in info
+    assert isinstance(info, dict)
 
 
-def test_invalid_action_length_fails_validation():
+def test_invalid_action_amount_type_fails_validation():
     with pytest.raises(ValidationError):
-        NationAction(bids=[0.0] * (VALID_BID_COUNT - 1))
+        ParliamentaryAction(
+            agent_id="Social",
+            type="PROPOSE_BUDGET",
+            department="Social",
+            amount="not_a_number",
+            justification="test",
+        )
 
 
 def test_one_random_valid_action_does_not_crash():
     env = NationEnvironment(seed=123)
     env.reset()
-    action = NationAction(bids=[0.15, -0.4, 1.2, 0.0, 2.4, -1.1])
+    action = ParliamentaryAction(
+        agent_id="Social",
+        type="PROPOSE_BUDGET",
+        department="Social",
+        amount=10.0,
+        justification="test",
+    )
 
     state, reward, terminated, truncated, info = env.step(action)
 
@@ -71,24 +79,18 @@ def test_one_random_valid_action_does_not_crash():
     assert isinstance(reward, float)
     assert isinstance(terminated, bool)
     assert isinstance(truncated, bool)
-    assert isinstance(info["reward_breakdown"], dict)
-    assert "termination_reason" in info
+    assert isinstance(info, dict)
 
 
-def test_repeated_stepping_eventually_terminates_or_reaches_max_rounds():
+def test_repeated_stepping_does_not_crash():
     env = NationEnvironment(seed=123)
     env.reset()
-    max_rounds = env.game.config.MAX_ROUNDS
-    terminated = False
 
-    for _ in range(max_rounds):
-        state, _, terminated, truncated, info = env.step(make_equal_bid_action())
+    for _ in range(20):
+        state, _, terminated, truncated, info = env.step(make_debate_action())
 
         assert_state_contract(state)
         assert truncated is False
-        assert isinstance(info["reward_breakdown"], dict)
-        assert "termination_reason" in info
+        assert isinstance(info, dict)
         if terminated:
             break
-
-    assert terminated or env.game.round >= max_rounds

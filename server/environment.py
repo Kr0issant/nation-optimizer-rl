@@ -113,11 +113,17 @@ class NationEnvironment(Environment):
                     agent_id=rejected[0],
                     rejected_departments=rejected,
                 )
-                return obs, 0.0, False, False, {
-                    "retry": True,
-                    "retry_count": self._retry_count,
-                    "rejected_departments": rejected,
-                }
+                return (
+                    obs,
+                    0.0,
+                    False,
+                    False,
+                    {
+                        "retry": True,
+                        "retry_count": self._retry_count,
+                        "rejected_departments": rejected,
+                    },
+                )
             elif rejected and self._retry_count >= MAX_PROPOSAL_RETRIES:
                 self.game.apply_fallback_allocations(rejected)
 
@@ -128,9 +134,9 @@ class NationEnvironment(Environment):
         obs = self._build_observation(agent_id=next_agent)
         return obs, 0.0, False, False, self._build_info(result)
 
-    def _run_system_phases(self, last_agent_id: str) -> tuple[
-        ParliamentaryObservation, float, bool, bool, dict
-    ]:
+    def _run_system_phases(
+        self, last_agent_id: str
+    ) -> tuple[ParliamentaryObservation, float, bool, bool, dict]:
         """
         Auto-advance through system phases 5-9.
         Returns the final observation + reward for this round.
@@ -175,7 +181,10 @@ class NationEnvironment(Environment):
 
         # Also include departments that abstained or never proposed
         for dept in self.departments:
-            if dept not in proposed_depts and dept not in self.game._abstained_departments:
+            if (
+                dept not in proposed_depts
+                and dept not in self.game._abstained_departments
+            ):
                 # Department never proposed — they need a proposal
                 if dept not in rejected:
                     rejected.append(dept)
