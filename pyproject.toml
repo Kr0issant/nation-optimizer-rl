@@ -1,0 +1,36 @@
+[project]
+name = "nation-optimizer-rl"
+version = "0.1.0"
+description = "OpenEnv-compatible multi-agent RL environment for parliamentary resource allocation."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+training = [
+    "accelerate>=0.34",
+    "datasets>=2.20",
+    "transformers>=4.44",
+    "trl>=0.10",
+]
+viz = [
+    "matplotlib>=3.8",
+]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.hatch.build.targets.wheel]
+packages = ["core", "server", "schemas", "agents", "telemetry", "evaluation", "training"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

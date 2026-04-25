@@ -109,6 +109,18 @@ Read the specification in order:
 3. [`03_TURN_STRUCTURE.md`](specification/03_TURN_STRUCTURE.md) for game flow
 4. [`APPENDIX_A_EXAMPLES.md`](specification/APPENDIX_A_EXAMPLES.md) for concrete scenarios
 
+## Development
+
+This project uses `uv` and top-level Python packages (`core`, `agents`, `schemas`, `telemetry`, `evaluation`, `training`).
+
+```bash
+uv sync --extra dev
+uv run pytest
+uv run python -m evaluation.benchmark_policies
+```
+
+Core game rules live in the engine layer; policy adapters consume observations and emit structured actions only. Central telemetry writes JSONL rollout records that can be reused for plots, evaluation, and training datasets.
+
 ## Hackathon Context
 
 Built for a meta RL hackathon using:

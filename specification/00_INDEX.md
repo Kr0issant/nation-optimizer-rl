@@ -31,6 +31,7 @@
 | `10_SUCCESS_CRITERIA.md` | Success Criteria | Winning/losing conditions, episode boundaries, baselines |
 | `11_GUARDRAILS.md` | Guardrails | Explicit exclusions, anti-patterns, and constraints |
 | `12_GLOSSARY.md` | Glossary | Defined terms used throughout the specification |
+| `13_RL_ADAPTERS_AND_TRAINING.md` | RL Adapters and Training Plan | Implementation-facing policy adapter, telemetry, evaluation, and training contract |
 | `APPENDIX_A_EXAMPLES.md` | Example Rounds | Annotated example rounds showing complete gameplay |
 
 ---
@@ -51,7 +52,8 @@ Follow this order for a progressive understanding of the system:
 10. **`10_SUCCESS_CRITERIA.md`** — Learn when the game ends and how performance is measured
 11. **`11_GUARDRAILS.md`** — Know the explicit constraints and forbidden actions
 12. **`12_GLOSSARY.md`** — Reference defined terms as needed while reading other documents
-13. **`APPENDIX_A_EXAMPLES.md`** — Study concrete examples that tie everything together
+13. **`13_RL_ADAPTERS_AND_TRAINING.md`** — Read this when implementing adapters, telemetry, evaluation, or training artifacts
+14. **`APPENDIX_A_EXAMPLES.md`** — Study concrete examples that tie everything together
 
 ---
 
@@ -67,7 +69,7 @@ This specification is the authoritative reference for the RL Parliament Environm
 - Use the glossary (12) when terminology is unclear
 
 **If you are training RL agents (agent team):**
-- Read documents in order: 01, 02, 07, 08, 09, 10
+- Read documents in order: 01, 02, 07, 08, 09, 10, 13
 - Focus on action space, observation space, and reward model
 - Study success criteria (10) to understand your optimization target
 
@@ -130,6 +132,7 @@ Some documents reference others. Use this map to find related content:
 | 10_SUCCESS_CRITERIA | 02, 04, 09 | (terminal document) |
 | 11_GUARDRAILS | 02, 03 | (referenced by all) |
 | 12_GLOSSARY | (references all) | (referenced by all) |
+| 13_RL_ADAPTERS_AND_TRAINING | 07, 08, 09, 10, 11 | implementation, evaluation, training |
 | APPENDIX_A_EXAMPLES | 02, 03, 04, 05, 06 | (example document) |
 
 ---
