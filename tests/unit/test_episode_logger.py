@@ -1,9 +1,13 @@
 import json
+from dataclasses import dataclass
+
+import pytest
 
 from schemas.actions import ActionType, DebateAction
 from schemas.phases import Phase
 from schemas.rewards import RewardInfo
 from telemetry import EpisodeLogger
+from telemetry.events import TelemetrySerializationError
 from telemetry.jsonl_writer import JsonlWriter
 
 
@@ -106,3 +110,53 @@ def test_jsonl_output_is_append_only(tmp_path) -> None:
         "observation",
         "termination",
     ]
+
+
+def test_logger_rejects_circular_payloads(tmp_path) -> None:
+    @dataclass
+    class Node:
+        name: str
+        child: "Node | None" = None
+
+    output_path = tmp_path / "episode.jsonl"
+    logger = EpisodeLogger(
+        episode_id="episode-1",
+        writer=JsonlWriter(output_path),
+    )
+    parent = Node(name="parent")
+    child = Node(name="child", child=parent)
+    parent.child = child
+
+    with pytest.raises(TelemetrySerializationError):
+        logger.log_observation(parent, round_number=1)
+
+
+def test_spec_required_helpers_emit_consistent_payloads(tmp_path) -> None:
+    output_path = tmp_path / "episode.jsonl"
+    logger = EpisodeLogger(
+        episode_id="episode-1",
+        writer=JsonlWriter(output_path),
+    )
+
+    logger.log_proposal({"proposal_id": "p1"}, round_number=2, agent_id="Health")
+    logger.log_vote({"proposal_id": "p1", "vote": "YES"}, round_number=2)
+    logger.log_treasury(950.0, round_number=2)
+    logger.log_prosperity(1200.0, round_number=2)
+    logger.log_productivity(1.1, round_number=2)
+
+    records = [
+        json.loads(line)
+        for line in output_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [record["event_type"] for record in records] == [
+        "proposal",
+        "vote",
+        "treasury",
+        "prosperity",
+        "productivity",
+    ]
+    assert records[0]["payload"] == {"proposal": {"proposal_id": "p1"}}
+    assert records[1]["payload"] == {"vote": {"proposal_id": "p1", "vote": "YES"}}
+    assert records[2]["payload"] == {"treasury": 950.0}
+    assert records[3]["payload"] == {"prosperity": 1200.0}
+    assert records[4]["payload"] == {"productivity": 1.1}
