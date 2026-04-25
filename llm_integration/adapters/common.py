@@ -7,7 +7,6 @@ from typing import Any
 
 from llm_integration.parsers import parse_action_json
 from schemas.actions import (
-    AbstainProposalAction,
     Action,
     ActionType,
     DebateAction,
@@ -79,7 +78,8 @@ def parse_allowed_action(
     valid_actions: set[str],
     agent_id: str,
 ) -> Action:
-    action = parse_action_json(completion)
+    target_proposal_id = getattr(observation, "target_proposal_id", None)
+    action = parse_action_json(completion, target_proposal_id=target_proposal_id)
     if action.type.value not in valid_actions:
         raise LLMActionError(
             f"LLM generated action type '{action.type.value}', "
@@ -89,6 +89,7 @@ def parse_allowed_action(
 
 
 def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> Action:
+<<<<<<< HEAD
     """Return the least harmful valid action for the current phase.
 
     Priority: propose a budget (keeps the game alive) > vote YES on pending
@@ -96,6 +97,10 @@ def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> A
     proposal phase starves every sector and triggers critical failure, so
     ``PROPOSE_BUDGET`` must come first.
     """
+=======
+    """Return the least invasive valid action for the current phase."""
+        
+>>>>>>> f4a8456d1ed3b821152bf5374a478629e1ce1697
     if ActionType.PROPOSE_BUDGET.value in valid_actions:
         dept_name = (
             observation.own_department.name
@@ -112,25 +117,12 @@ def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> A
         )
 
     if ActionType.VOTE.value in valid_actions:
-        dept = (
-            observation.own_department.name
-            if observation.own_department
-            else ""
-        )
-        target = None
-        for p in observation.proposals:
-            owner = getattr(p, "agent_id", None) or p.department
-            if (
-                p.status == "pending"
-                and p.department != dept
-                and owner != dept
-                and dept not in (p.votes or {})
-            ):
-                target = p
-                break
-        if target is None and observation.proposals:
-            target = observation.proposals[0]
-        target_id = target.proposal_id if target else "unknown_id"
+        # Prioritize the target_proposal_id from the environment
+        target_id = getattr(observation, "target_proposal_id", None)
+        if not target_id:
+            # Fallback to the first pending proposal if target is missing
+            pending_ids = [p.proposal_id for p in observation.proposals if p.status == "pending"]
+            target_id = pending_ids[0] if pending_ids else "unknown_id"
         return VoteAction(
             type=ActionType.VOTE,
             proposal_id=target_id,

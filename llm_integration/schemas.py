@@ -19,14 +19,9 @@ class LLMProposeBudgetAction(BaseModel):
     justification: str = Field(description="A public justification for the requested amount.")
 
 class LLMVoteAction(BaseModel):
-    """Schema for casting a vote on a budget proposal."""
+    """Schema for casting a vote on the current budget proposal."""
     type: Literal["VOTE"] = Field(description="The action type. Must be 'VOTE'.")
-    proposal_id: str = Field(description="The ID of the proposal you are voting on.")
     vote: Literal["YES", "NO", "ABSTAIN"] = Field(description="Your vote choice.")
-
-class LLMAbstainAction(BaseModel):
-    """Schema for abstaining from proposing a budget."""
-    type: Literal["ABSTAIN_FROM_PROPOSAL"] = Field(description="The action type. Must be 'ABSTAIN_FROM_PROPOSAL'.")
 
 class LLMFinishDebateAction(BaseModel):
     """Schema for ending the debate phase early."""
@@ -38,6 +33,5 @@ LLMAction = Union[
     LLMDebateAction, 
     LLMProposeBudgetAction, 
     LLMVoteAction, 
-    LLMAbstainAction,
     LLMFinishDebateAction
 ]

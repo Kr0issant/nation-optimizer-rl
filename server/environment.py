@@ -143,14 +143,28 @@ class NationEnvironment(Environment):
         """
         # Step through system phases until we reach next round's agent phase or done
         result = None
-        while not self.game.done and self.game.phase in (
-            Phase.BUDGET_EXECUTION,
-            Phase.CONSUMPTION_AND_EVENT_IMPACT,
-            Phase.REVENUE_CALCULATION,
-            Phase.SURPLUS_ROLLOVER,
-            Phase.TERMINATION_CHECK,
-        ):
-            result = self.game.step(None)
+        while not self.game.done:
+            phase = self.game.phase
+            
+            # If in VOTING phase but no proposals, advance
+            if phase == Phase.VOTING:
+                pending = [p for p in self.game.proposals if p.status == "pending"]
+                if not pending:
+                    result = self.game.step(None)
+                    continue
+
+            if phase in (
+                Phase.BUDGET_EXECUTION,
+                Phase.CONSUMPTION_AND_EVENT_IMPACT,
+                Phase.REVENUE_CALCULATION,
+                Phase.SURPLUS_ROLLOVER,
+                Phase.TERMINATION_CHECK,
+            ):
+                result = self.game.step(None)
+                continue
+            
+            # Not a system phase or done
+            break
 
         # Capture the round reward if available
         if result:
@@ -179,12 +193,9 @@ class NationEnvironment(Environment):
             if p.status == "rejected" or p.status == "rejected_invalid":
                 rejected.append(p.department)
 
-        # Also include departments that abstained or never proposed
+        # Also include departments that never proposed
         for dept in self.departments:
-            if (
-                dept not in proposed_depts
-                and dept not in self.game._abstained_departments
-            ):
+            if dept not in proposed_depts:
                 # Department never proposed — they need a proposal
                 if dept not in rejected:
                     rejected.append(dept)
@@ -211,10 +222,7 @@ class NationEnvironment(Environment):
         if phase == Phase.PROPOSAL:
             # Return first department that hasn't submitted yet
             for dept in self._get_proposal_order():
-                if (
-                    dept not in self.game._submitted_departments
-                    and dept not in self.game._abstained_departments
-                ):
+                if dept not in self.game._submitted_departments:
                     return dept
             return self.departments[0]
 
@@ -308,11 +316,22 @@ class NationEnvironment(Environment):
             )
 
         # Valid actions for current phase
-        phase = gs.get("phase")
-        if phase is not None:
-            valid = list(valid_action_types_for_phase(phase))
+        phase_int = gs.get("phase")
+        if phase_int is not None:
+            valid = list(valid_action_types_for_phase(phase_int))
         else:
             valid = []
+
+        # Determine target_proposal_id for voting phase
+        target_proposal_id = None
+        if phase_int is not None and Phase(phase_int) == Phase.VOTING:
+            # We must focus on the same proposal that _determine_next_agent uses
+            pending = [p for p in proposals if p.status == "pending"]
+            for target in pending:
+                required_votes = len(self.departments) - 1
+                if len(target.votes) < required_votes:
+                    target_proposal_id = target.proposal_id
+                    break
 
         return ParliamentaryObservation(
             round=gs.get("round", 0),
@@ -330,6 +349,7 @@ class NationEnvironment(Environment):
             debate_messages=gs.get("debate_messages", []),
             own_department=own_dept,
             valid_actions=valid,
+            target_proposal_id=target_proposal_id,
             termination=gs.get("termination", {}),
             current_agent=agent_id,
             retry_count=self._retry_count,

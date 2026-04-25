@@ -206,7 +206,6 @@ class NationGame:
         self.votes: list[dict[str, str]] = []
         self._proposal_counter = 0
         self._submitted_departments: set[str] = set()
-        self._abstained_departments: set[str] = set()
 
         self.treasury = Treasury(
             balance=self.config.INITIAL_TREASURY,
@@ -304,7 +303,6 @@ class NationGame:
         self.proposals = []
         self.votes = []
         self._submitted_departments = set()
-        self._abstained_departments = set()
 
         for sector in self.sectors.values():
             sector.reset_round()
@@ -335,8 +333,6 @@ class NationGame:
             self._handle_debate(action, info)
         elif action_type == ActionType.PROPOSE_BUDGET.value:
             self._handle_proposal(action, info)
-        elif action_type == ActionType.ABSTAIN_FROM_PROPOSAL.value:
-            self._handle_proposal_abstention(action, info)
         elif action_type == ActionType.VOTE.value:
             self._handle_vote(action, info)
 
@@ -379,14 +375,6 @@ class NationGame:
         )
         self._submitted_departments.add(department)
         info["accepted_actions"].append({"type": ActionType.PROPOSE_BUDGET.value, "proposal_id": proposal.proposal_id})
-
-    def _handle_proposal_abstention(self, action: Mapping[str, Any], info: dict[str, Any]) -> None:
-        department = str(action.get("department") or action.get("agent_id") or action.get("agent") or "")
-        if department not in self.sectors or department in self._submitted_departments:
-            info["ignored_actions"].append({"action": dict(action), "reason": "invalid_abstention"})
-            return
-        self._abstained_departments.add(department)
-        info["accepted_actions"].append({"type": ActionType.ABSTAIN_FROM_PROPOSAL.value, "department": department})
 
     def _handle_vote(self, action: Mapping[str, Any], info: dict[str, Any]) -> None:
         proposal_id = str(action.get("proposal_id", ""))
@@ -613,9 +601,8 @@ class NationGame:
             return
 
         if self.phase == Phase.PROPOSAL:
-            # Only advance if all departments have either submitted or abstained
-            total_active = len(self._submitted_departments) + len(self._abstained_departments)
-            if total_active < len(self.sectors):
+            # Only advance if all departments have submitted a proposal
+            if len(self._submitted_departments) < len(self.sectors):
                 return
 
         if self.phase == Phase.VOTING:
@@ -665,7 +652,6 @@ class NationGame:
         # Allow rejected departments to submit again
         for dept in rejected_departments:
             self._submitted_departments.discard(dept)
-            self._abstained_departments.discard(dept)
         # Clear votes (new proposals need new votes)
         self.votes = []
         # Rewind phase

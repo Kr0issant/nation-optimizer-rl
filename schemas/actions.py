@@ -9,7 +9,6 @@ class ActionType(StrEnum):
     DEBATE = "DEBATE"
     PROPOSE_BUDGET = "PROPOSE_BUDGET"
     VOTE = "VOTE"
-    ABSTAIN_FROM_PROPOSAL = "ABSTAIN_FROM_PROPOSAL"
     FINISH_DEBATE = "FINISH_DEBATE"
 
 
@@ -50,14 +49,6 @@ class VoteAction:
 
 
 @dataclass(frozen=True, slots=True)
-class AbstainProposalAction:
-    type: Literal[ActionType.ABSTAIN_FROM_PROPOSAL]
-
-    def to_dict(self) -> dict[str, Any]:
-        return _enum_safe_asdict(self)
-
-
-@dataclass(frozen=True, slots=True)
 class FinishDebateAction:
     type: Literal[ActionType.FINISH_DEBATE]
     reason: str
@@ -67,7 +58,7 @@ class FinishDebateAction:
 
 
 Action: TypeAlias = (
-    DebateAction | ProposeBudgetAction | VoteAction | AbstainProposalAction | FinishDebateAction
+    DebateAction | ProposeBudgetAction | VoteAction | FinishDebateAction
 )
 
 

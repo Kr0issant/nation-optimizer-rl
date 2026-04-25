@@ -43,4 +43,5 @@ class Observation:
     proposals: tuple[ProposalObservation, ...] = field(default_factory=tuple)
     votes: tuple[VoteObservation, ...] = field(default_factory=tuple)
     debate_messages: tuple[dict[str, str], ...] = field(default_factory=tuple)
+    target_proposal_id: str | None = None
     termination: dict[str, Any] = field(default_factory=dict)
