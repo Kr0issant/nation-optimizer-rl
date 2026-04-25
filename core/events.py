@@ -28,10 +28,10 @@ class Event:
     name: str
     severity: int
     affected_sectors: dict[str, float]  # sector_name → multiplier
-    treasury_injection: float           # >0 for positive events, 0 otherwise
-    description: str
+    category: str
     narrative: str
-    category: str  # "negative" | "positive" | "black_swan"
+    description: str = ""
+    _treasury_injection: float = field(default=0.0, repr=False)
 
     def to_dict(self) -> dict:
         return {
@@ -39,7 +39,6 @@ class Event:
             "name": self.name,
             "severity": self.severity,
             "affected_sectors": dict(self.affected_sectors),
-            "treasury_injection": self.treasury_injection,
             "description": self.description,
             "narrative": self.narrative,
             "category": self.category,
@@ -74,6 +73,7 @@ class EventEngine:
         self._negative: list[dict] = data.get("negative_events", [])
         self._positive: list[dict] = data.get("positive_events", [])
         self._black_swan: list[dict] = data.get("black_swan_events", [])
+        self.catalog: list[dict] = [*self._negative, *self._positive, *self._black_swan]
 
         # Pre-index by category for fast lookup
         self._by_category: dict[str, list[dict]] = {
@@ -87,7 +87,11 @@ class EventEngine:
 
     # ── Public API ──────────────────────────────────────────────
 
-    def generate_events(self, sector_names: list[str] | None = None) -> list[Event]:
+    def generate_events(
+        self,
+        rng: random.Random | list[str] | None = None,
+        sector_names: list[str] | None = None,
+    ) -> list[Event]:
         """
         Generate 0–2 events for the current round.
 
@@ -101,22 +105,29 @@ class EventEngine:
         list[Event]
             Generated events (may be empty for a quiet round).
         """
-        tier = self._roll_tier()
+        if isinstance(rng, random.Random):
+            active_rng = rng
+        else:
+            active_rng = self.rng
+            if isinstance(rng, list) and sector_names is None:
+                sector_names = rng
+
+        tier = self._roll_tier(active_rng)
 
         if tier == "no_event":
             return []
 
         if tier == "compound":
             # Compound crisis: 2 black swan events simultaneously
-            return self._generate_compound(sector_names or [])
+            return self._generate_compound(sector_names or [], active_rng)
 
         # Single event from the appropriate category pool
         pool = self._by_category.get(tier, [])
         if not pool:
             return []
 
-        template = self.rng.choice(pool)
-        return [self._instantiate(template, sector_names)]
+        template = active_rng.choice(pool)
+        return [self._instantiate(template, sector_names, active_rng, category=tier)]
 
     def apply_events(
         self,
@@ -143,8 +154,8 @@ class EventEngine:
                     sectors[sector_name].event_multiplier *= multiplier
 
             # Treasury injection (positive events only)
-            if event.treasury_injection > 0:
-                treasury.credit(event.treasury_injection)
+            if event._treasury_injection > 0:
+                treasury.credit(event._treasury_injection)
 
             if event.severity >= 4:
                 crisis = True
@@ -153,31 +164,34 @@ class EventEngine:
 
     # ── Internal helpers ────────────────────────────────────────
 
-    def _roll_tier(self) -> str:
+    def _roll_tier(self, rng: random.Random) -> str:
         """Weighted random draw from the event distribution."""
         tiers = list(self._distribution.keys())
         weights = list(self._distribution.values())
-        return self.rng.choices(tiers, weights=weights, k=1)[0]
+        return rng.choices(tiers, weights=weights, k=1)[0]
 
     def _instantiate(
         self,
         template: dict,
         sector_names: list[str] | None = None,
+        rng: random.Random | None = None,
+        category: str | None = None,
     ) -> Event:
         """Turn a catalog template into a concrete Event instance."""
+        rng = rng or self.rng
         # Black swan events have fixed severity
         if "severity" in template and not isinstance(template["severity"], list):
             severity = template["severity"]
         else:
             lo, hi = template.get("severity_range", [1, 5])
-            severity = self.rng.randint(lo, hi)
+            severity = rng.randint(lo, hi)
 
         # Determine affected sectors and multipliers
         if "affected_sectors" in template:
             affected = dict(template["affected_sectors"])
         elif "primary_multiplier" in template:
             # Black swan — pick a random primary sector
-            primary = self.rng.choice(sector_names) if sector_names else "Social"
+            primary = rng.choice(sector_names) if sector_names else "Social"
             affected = {primary: template["primary_multiplier"]}
             secondary_mult = template.get("secondary_multiplier", 1.5)
             for name in (sector_names or []):
@@ -187,7 +201,7 @@ class EventEngine:
             # Compound crisis — all sectors hit hard
             lo, hi = template["affected_sectors_multiplier_range"]
             affected = {
-                name: round(self.rng.uniform(lo, hi), 2)
+                name: round(rng.uniform(lo, hi), 2)
                 for name in (sector_names or [])
             }
         else:
@@ -195,32 +209,40 @@ class EventEngine:
 
         # Pick narrative
         narratives = template.get("narratives", [template.get("description", "")])
-        narrative = self.rng.choice(narratives) if narratives else ""
+        narrative = rng.choice(narratives) if narratives else ""
 
-        # Determine category label
-        if template in self._black_swan:
-            cat = "black_swan"
-        elif template.get("treasury_injection"):
-            cat = "positive"
-        else:
-            cat = "negative"
+        cat = category or template.get("category", "minor")
 
         return Event(
             id=template.get("id", "unknown"),
             name=template.get("name", "Unknown Event"),
             severity=severity,
             affected_sectors=affected,
-            treasury_injection=float(template.get("treasury_injection", 0)),
-            description=template.get("description", ""),
-            narrative=narrative,
             category=cat,
+            narrative=narrative,
+            description=template.get("description", ""),
+            _treasury_injection=float(template.get("treasury_injection", 0)),
         )
 
-    def _generate_compound(self, sector_names: list[str]) -> list[Event]:
+    def _generate_compound(self, sector_names: list[str], rng: random.Random) -> list[Event]:
         """Generate 2 black-swan events for a compound crisis."""
         events: list[Event] = []
-        for template in self.rng.sample(
+        for template in rng.sample(
             self._black_swan, k=min(2, len(self._black_swan))
         ):
-            events.append(self._instantiate(template, sector_names))
+            events.append(self._instantiate(template, sector_names, rng, category="compound"))
         return events
+
+
+def generate_events(rng: random.Random) -> list[Event]:
+    """Generate catalog events using a caller-provided RNG."""
+    return EventEngine().generate_events(rng)
+
+
+def sector_multipliers(events: list[Event]) -> dict[str, float]:
+    """Aggregate sector demand multipliers multiplicatively."""
+    multipliers: dict[str, float] = {}
+    for event in events:
+        for sector_name, multiplier in event.affected_sectors.items():
+            multipliers[sector_name] = multipliers.get(sector_name, 1.0) * multiplier
+    return multipliers

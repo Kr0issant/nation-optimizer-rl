@@ -9,6 +9,8 @@ import math
 import sys
 from pathlib import Path
 
+import pytest
+
 # Fix Windows encoding issues when redirecting stdout
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -143,8 +145,9 @@ def test_treasury():
     t.apply_baseline_tax()
     assert t.balance == 900
 
-    t.debit(1000)
-    assert t.is_bankrupt()
+    with pytest.raises(ValueError):
+        t.debit(1000)
+    assert not t.is_bankrupt()
     print("  ✓ Treasury operations correct")
 
 

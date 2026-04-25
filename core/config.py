@@ -13,36 +13,53 @@ from pathlib import Path
 from typing import ClassVar
 
 
+INITIAL_TREASURY = 1000
+BASELINE_TAX = 100
+INITIAL_POPULATION = 1_000_000
+INITIAL_PRODUCTIVITY = 1.0
+MIN_PRODUCTIVITY = 0.5
+MAX_PRODUCTIVITY = 2.0
+MAX_ROUNDS = 50
+CRITICAL_RATIO = 0.4
+SURPLUS_RATIO = 1.5
+WASTAGE_RATIO = 2.5
+RF_MAX = 1.8
+PRODUCTIVITY_STEP = 0.05
+BASE_BIRTH_RATE = 0.005
+BASE_DEATH_RATE = 0.002
+CRISIS_DEATH_PENALTY = 0.01
+
+
 @dataclass(frozen=True)
 class GameConfig:
     """Immutable configuration for a NationGame episode."""
 
     # ── Population ──────────────────────────────────────────────
-    POP_0: int = 1_000_000
+    POP_0: int = INITIAL_POPULATION
 
     # ── Treasury ────────────────────────────────────────────────
-    INITIAL_TREASURY: float = 1000.0
-    BASELINE_TAX: float = 100.0
+    INITIAL_TREASURY: float = float(INITIAL_TREASURY)
+    BASELINE_TAX: float = float(BASELINE_TAX)
 
     # ── Productivity ────────────────────────────────────────────
-    INITIAL_PRODUCTIVITY: float = 1.0
-    PRODUCTIVITY_MIN: float = 0.5
-    PRODUCTIVITY_MAX: float = 2.0
-    PRODUCTIVITY_STEP: float = 0.05
+    INITIAL_PRODUCTIVITY: float = INITIAL_PRODUCTIVITY
+    PRODUCTIVITY_MIN: float = MIN_PRODUCTIVITY
+    PRODUCTIVITY_MAX: float = MAX_PRODUCTIVITY
+    PRODUCTIVITY_STEP: float = PRODUCTIVITY_STEP
 
     # ── Revenue-curve ratios (relative to Demand) ───────────────
-    CRITICAL_RATIO: float = 0.4
-    SURPLUS_RATIO: float = 1.5
-    WASTAGE_RATIO: float = 2.5
-    RF_MAX: float = 1.8  # peak revenue factor at surplus
+    CRITICAL_RATIO: float = CRITICAL_RATIO
+    SURPLUS_RATIO: float = SURPLUS_RATIO
+    WASTAGE_RATIO: float = WASTAGE_RATIO
+    RF_MAX: float = RF_MAX  # peak revenue factor at surplus
 
     # ── Population dynamics ─────────────────────────────────────
-    BIRTH_RATE_BASE: float = 0.005
-    DEATH_RATE_BASE: float = 0.002
-    CRISIS_DEATH_PENALTY: float = 0.01
+    BIRTH_RATE_BASE: float = BASE_BIRTH_RATE
+    DEATH_RATE_BASE: float = BASE_DEATH_RATE
+    CRISIS_DEATH_PENALTY: float = CRISIS_DEATH_PENALTY
 
     # ── Episode limits ──────────────────────────────────────────
-    MAX_ROUNDS: int = 50
+    MAX_ROUNDS: int = MAX_ROUNDS
     SHUTDOWN_THRESHOLD: int = 2  # consecutive zero-alloc rounds
 
     # ── Reward components ───────────────────────────────────────
