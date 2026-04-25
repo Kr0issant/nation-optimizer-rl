@@ -19,9 +19,12 @@ dev = [
 ]
 training = [
     "accelerate>=0.34",
+    "bitsandbytes>=0.43; platform_system != 'Windows'",
     "datasets>=2.20",
+    "peft>=0.12",
+    "trackio>=0.1",
     "transformers>=4.44",
-    "trl>=0.10",
+    "trl>=0.20",
 ]
 viz = [
     "matplotlib>=3.8",

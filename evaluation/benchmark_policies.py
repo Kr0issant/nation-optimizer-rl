@@ -30,6 +30,8 @@ from telemetry.run_summary import RunSummary
 DEFAULT_SEEDS = (1, 2, 3)
 DEFAULT_MAX_ROUNDS = 3
 DEFAULT_OUTPUT_PATH = Path("assets/results/benchmark_summary.json")
+DEFAULT_BASE_LLM_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
+DEFAULT_GRPO_LORA_REPO = "nation-optimizer/nation-parliamentary-grpo-lora"
 
 AdapterFactory = Callable[[int], PolicyAdapter]
 
@@ -42,17 +44,53 @@ BASELINE_FACTORIES: tuple[tuple[str, AdapterFactory], ...] = (
 )
 
 
+def llm_factories(
+    *,
+    base_model: str = DEFAULT_BASE_LLM_MODEL,
+    grpo_lora: str | None = DEFAULT_GRPO_LORA_REPO,
+) -> tuple[tuple[str, AdapterFactory], ...]:
+    """Return LLM-backed adapter factories for the parliamentary baseline pair.
+
+    Imports are deferred so the rule-based benchmark stays fast and the
+    Hugging Face / transformers extras stay strictly optional.
+    """
+    from llm_integration.adapters.parliamentary import ParliamentaryLLMAdapter
+    from llm_integration.local_client import LocalTransformersClient
+
+    factories: list[tuple[str, AdapterFactory]] = [
+        (
+            "parliamentary_base",
+            lambda _seed, _base=base_model: ParliamentaryLLMAdapter(
+                client=LocalTransformersClient(_base),
+                model=_base,
+            ),
+        )
+    ]
+    if grpo_lora:
+        factories.append(
+            (
+                "parliamentary_grpo",
+                lambda _seed, _base=base_model, _lora=grpo_lora: ParliamentaryLLMAdapter(
+                    client=LocalTransformersClient(_base, lora=_lora),
+                    model=f"{_base}+grpo",
+                ),
+            )
+        )
+    return tuple(factories)
+
+
 def run_benchmarks(
     *,
     seeds: Iterable[int] = DEFAULT_SEEDS,
     max_rounds: int = DEFAULT_MAX_ROUNDS,
     disable_events: bool = False,
+    extra_factories: tuple[tuple[str, AdapterFactory], ...] = (),
 ) -> dict[str, Any]:
     seed_values = tuple(seeds)
     config = replace(GameConfig.from_json(), MAX_ROUNDS=max_rounds)
     policy_results = []
 
-    for policy_name, adapter_factory in BASELINE_FACTORIES:
+    for policy_name, adapter_factory in (*BASELINE_FACTORIES, *extra_factories):
         episodes = tuple(
             run_episode(
                 policy_name=policy_name,
@@ -295,21 +333,57 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("assets/results"),
         help="Directory for generated PNG plots.",
     )
+    parser.add_argument(
+        "--include-llm",
+        action="store_true",
+        help=(
+            "Also benchmark parliamentary_base (untrained) and "
+            "parliamentary_grpo (trained LoRA). Requires the training extras."
+        ),
+    )
+    parser.add_argument(
+        "--llm-base-model",
+        default=DEFAULT_BASE_LLM_MODEL,
+        help="Base HF model id for both parliamentary policies.",
+    )
+    parser.add_argument(
+        "--llm-grpo-lora",
+        default=DEFAULT_GRPO_LORA_REPO,
+        help="LoRA repo or path for the trained parliamentary policy.",
+    )
+    parser.add_argument(
+        "--no-llm-grpo",
+        action="store_true",
+        help="When --include-llm is set, omit the trained LoRA variant.",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    extra_factories: tuple[tuple[str, AdapterFactory], ...] = ()
+    if args.include_llm:
+        extra_factories = llm_factories(
+            base_model=args.llm_base_model,
+            grpo_lora=None if args.no_llm_grpo else args.llm_grpo_lora,
+        )
     payload = run_benchmarks(
         seeds=_parse_seeds(args.seeds),
         max_rounds=args.max_rounds,
         disable_events=args.disable_events,
+        extra_factories=extra_factories,
     )
     write_benchmark_json(payload, args.output)
     if args.plot:
-        from telemetry.plotter import plot_benchmark_payload
+        from telemetry.plotter import (
+            plot_benchmark_payload,
+            plot_policy_comparison,
+            plot_survival_rounds,
+        )
 
         plot_benchmark_payload(payload, args.plot_dir)
+        plot_policy_comparison(payload, args.plot_dir)
+        plot_survival_rounds(payload, args.plot_dir)
     print(json.dumps(payload["policies"], indent=2, sort_keys=True))
 
 

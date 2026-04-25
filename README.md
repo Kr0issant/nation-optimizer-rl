@@ -151,6 +151,66 @@ docker run --rm -p 8000:8000 nation-optimizer-rl
 
 Tests and CI should use mock `TextGenerationClient` implementations, so no network or `HF_TOKEN` is required. For live inference, install `huggingface_hub`, set `HF_TOKEN` and `HF_MODEL_ID`, and construct `HuggingFaceTextGenerationClient`. Training and fine-tuning are separate from these inference adapters and belong to Mega 4 under `training/`.
 
+## Trained policy (GRPO)
+
+The parliamentary minister adapter is fine-tuned with TRL's `GRPOTrainer` on top of `Qwen/Qwen2.5-0.5B-Instruct` using LoRA. Prompts are collected from `OptimalZoneAdapter` rollouts via [`scripts/collect_grpo_prompts.py`](scripts/collect_grpo_prompts.py) and use the live [`render_minister_prompt`](llm_integration/prompts/minister.py) template, so the same template drives both training and inference. Only Phase 3 (`PROPOSAL`) and Phase 4 (`VOTING`) turns receive reward updates — debate stays inference-only.
+
+The reward function in [`training/reward_fn.py`](training/reward_fn.py) is dense and grounded in the engine's own piecewise revenue curve from [`core/revenue.py`](core/revenue.py): proposals are scored against their sector's `(critical, demand, surplus)` thresholds, votes are scored by the revenue factor of the proposed allocation, and parsing/legality failures are penalised explicitly.
+
+- **Trained LoRA on the Hub:** [`nation-optimizer/nation-parliamentary-grpo-lora`](https://huggingface.co/nation-optimizer/nation-parliamentary-grpo-lora)
+- **Prompt dataset:** [`nation-optimizer/nation-parliamentary-prompts`](https://huggingface.co/datasets/nation-optimizer/nation-parliamentary-prompts)
+- **Trackio training curves:** [`nation-optimizer/grpo-parliamentary`](https://huggingface.co/spaces/nation-optimizer/grpo-parliamentary) (loss + mean reward per step)
+
+### Reproduce the run
+
+Collect prompts and push them to the Hub:
+
+```bash
+uv run python -m scripts.collect_grpo_prompts \
+    --seeds 50 --max-rounds 12 \
+    --output assets/datasets/grpo_prompts.jsonl \
+    --push-to-hub nation-optimizer/nation-parliamentary-prompts
+```
+
+Train on Hugging Face Jobs (GRPO + LoRA, ~$5 on `a10g-small`):
+
+```bash
+hf jobs uv run --flavor a10g-small --secrets HF_TOKEN \
+    training/train_grpo.py \
+    --dataset-id nation-optimizer/nation-parliamentary-prompts \
+    --hub-model-id nation-optimizer/nation-parliamentary-grpo-lora
+```
+
+Locally, the same script runs in `--smoke` mode (5 GRPO steps, batch 1, no Hub push) to prove the pipeline imports and the reward function scores real generations:
+
+```bash
+uv run --extra training python training/train_grpo.py --smoke \
+    --dataset-id nation-optimizer/nation-parliamentary-prompts
+```
+
+### Before-vs-after evidence
+
+The benchmark CLI runs the trained LoRA, the untrained base model, and the rule-based baselines against shared seeds:
+
+```bash
+uv run --extra training --extra viz python -m evaluation.benchmark_policies \
+    --seeds 1,2,3,4,5,6,7,8,9,10 --max-rounds 12 \
+    --include-llm --plot
+```
+
+Outputs land in `assets/results/`:
+
+| File | Content |
+|------|---------|
+| `policy_comparison.png` | Mean episode return per policy, with the trained LoRA highlighted |
+| `survival_rounds.png` | Distribution of rounds survived per policy across all seeds |
+| `baseline_mean_episode_return.png` | Per-baseline mean return (rule-based only) |
+| `baseline_survival_rounds.png` | Per-baseline survival (rule-based only) |
+| `benchmark_summary.json` | Raw per-episode metrics for every policy |
+
+![Policy comparison](assets/results/policy_comparison.png)
+![Survival distribution](assets/results/survival_rounds.png)
+
 ## Hackathon Context
 
 This project targets the **OpenEnv Hackathon** (India 2026) expectations (themes, judging weights, and **minimum submission** requirements). In short:

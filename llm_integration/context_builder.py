@@ -3,7 +3,7 @@ Logic to convert the raw NationEnvironment observation into a clean LLM context 
 """
 
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Mapping
 from schemas.observations import Observation
 
 HIDDEN_EVENT_FIELDS = frozenset(
@@ -16,6 +16,8 @@ HIDDEN_EVENT_FIELDS = frozenset(
         "random_variance",
     }
 )
+
+PUBLIC_SECTOR_FIELDS = ("critical", "demand", "surplus")
 
 def build_public_observation(observation: Any) -> dict[str, Any]:
     """Builds a public-facing observation for ministers."""
@@ -41,6 +43,29 @@ def build_oracle_observation(observation: Observation) -> dict[str, Any]:
         "oracle_own_department": asdict(observation.own_department) if observation.own_department else None,
         "event_ledger": [dict(event) for event in observation.event_ledger],
     }
+
+def build_sector_thresholds(state: Mapping[str, Any]) -> dict[str, dict[str, float]]:
+    """Return public per-sector ``(critical, demand, surplus)`` thresholds.
+
+    The reward function uses these to score proposed allocations against the
+    same piecewise revenue curve the engine evaluates during the budget
+    execution phase. Only public fields are exposed; hidden event costs and
+    private metrics are deliberately omitted.
+    """
+    sectors = state.get("sectors") or {}
+    if not isinstance(sectors, Mapping):
+        raise TypeError("state['sectors'] must be a mapping of sector name to sector dict.")
+
+    thresholds: dict[str, dict[str, float]] = {}
+    for name, sector in sectors.items():
+        if not isinstance(sector, Mapping):
+            raise TypeError(f"sector entry for {name!r} must be a mapping.")
+        thresholds[str(name)] = {
+            field: float(sector[field])
+            for field in PUBLIC_SECTOR_FIELDS
+        }
+    return thresholds
+
 
 def _sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     """Removes hidden fields from events unless cost is already public."""
