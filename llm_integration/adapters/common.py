@@ -78,13 +78,20 @@ def parse_allowed_action(
     valid_actions: set[str],
     agent_id: str,
 ) -> Action:
-    return parse_action_json(completion)
+    action = parse_action_json(completion)
+    if action.type.value not in valid_actions:
+        raise LLMActionError(
+            f"LLM generated action type '{action.type.value}', "
+            f"but only {valid_actions} are allowed in this phase."
+        )
+    return action
 
 
 def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> Action:
     """Return the least invasive valid action for the current phase."""
     if ActionType.ABSTAIN_FROM_PROPOSAL.value in valid_actions:
         return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
+        
     if ActionType.PROPOSE_BUDGET.value in valid_actions:
         return ProposeBudgetAction(
             type=ActionType.PROPOSE_BUDGET,
@@ -92,15 +99,24 @@ def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> A
             amount=0.0,
             justification=SAFE_FALLBACK_JUSTIFICATION,
         )
-    if ActionType.VOTE.value in valid_actions and observation.proposals:
+        
+    if ActionType.VOTE.value in valid_actions:
+        # Find the first pending proposal to vote on
+        pending_ids = [p.proposal_id for p in observation.proposals if p.status == "pending"]
+        target_id = pending_ids[0] if pending_ids else (observation.proposals[0].proposal_id if observation.proposals else "unknown_id")
         return VoteAction(
             type=ActionType.VOTE,
-            proposal_id=observation.proposals[0].proposal_id,
+            proposal_id=target_id,
             vote=VoteChoice.ABSTAIN,
         )
+        
     if ActionType.DEBATE.value in valid_actions:
         return DebateAction(type=ActionType.DEBATE, message=SAFE_FALLBACK_DEBATE)
-    raise LLMActionError("No safe fallback action is valid for this phase.")
+        
+    if ActionType.FINISH_DEBATE.value in valid_actions:
+         return FinishDebateAction(type=ActionType.FINISH_DEBATE, reason="Automatic timeout fallback.")
+
+    raise LLMActionError(f"No safe fallback action is valid for this phase. Valid: {valid_actions}")
 
 
 def log_llm_call(

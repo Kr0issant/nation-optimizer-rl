@@ -35,8 +35,8 @@ from schemas.actions import (
 PARSE_FAIL_REWARD = -1.0
 ILLEGAL_ACTION_REWARD = -0.5
 ABSTAIN_REWARD = 0.0
-PROPOSE_BASE_REWARD = 0.4
-PROPOSE_FACTOR_WEIGHT = 0.6
+PROPOSE_BASE_REWARD = 0.1
+PROPOSE_FACTOR_WEIGHT = 0.9
 
 
 def make_reward_fn() -> Callable[..., list[float]]:

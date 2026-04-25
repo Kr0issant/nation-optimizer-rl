@@ -1,17 +1,17 @@
 {
   "event_distribution": {
-    "no_event": 0.40,
-    "minor": 0.35,
-    "moderate": 0.20,
-    "critical": 0.04,
-    "compound": 0.01
+    "no_event": 0.60,
+    "minor": 0.25,
+    "moderate": 0.12,
+    "critical": 0.025,
+    "compound": 0.005
   },
 
   "negative_events": [
     {
       "id": "war",
       "name": "War",
-      "severity_range": [3, 5],
+      "severity_range": [2, 4],
       "affected_sectors": {
         "Defense": 2.5,
         "Agriculture": 1.3,
@@ -28,7 +28,7 @@
     {
       "id": "famine",
       "name": "Famine",
-      "severity_range": [2, 4],
+      "severity_range": [1, 3],
       "affected_sectors": {
         "Agriculture": 2.0,
         "Health": 1.5,
@@ -45,7 +45,7 @@
     {
       "id": "virus_outbreak",
       "name": "Virus Outbreak",
-      "severity_range": [2, 5],
+      "severity_range": [1, 4],
       "affected_sectors": {
         "Health": 2.5,
         "Commerce": 1.4,
@@ -95,7 +95,7 @@
     {
       "id": "market_crash",
       "name": "Market Crash",
-      "severity_range": [3, 5],
+      "severity_range": [2, 4],
       "affected_sectors": {
         "Commerce": 2.5,
         "Social": 1.2,
@@ -132,7 +132,7 @@
     {
       "id": "infrastructure_collapse",
       "name": "Infrastructure Collapse",
-      "severity_range": [3, 4],
+      "severity_range": [2, 3],
       "affected_sectors": {
         "Social": 2.5,
         "Commerce": 1.4,

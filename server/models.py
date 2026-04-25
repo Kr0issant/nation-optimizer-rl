@@ -65,16 +65,20 @@ class ParliamentaryAction(Action):
 
     The `type` field determines which optional fields are required:
       - DEBATE:                 requires `message`
+      - FINISH_DEBATE:          requires `reason`
       - PROPOSE_BUDGET:         requires `department`, `amount`, `justification`
       - VOTE:                   requires `proposal_id`, `vote`
       - ABSTAIN_FROM_PROPOSAL:  no extra fields needed
     """
 
     agent_id: str
-    type: str  # DEBATE | PROPOSE_BUDGET | VOTE | ABSTAIN_FROM_PROPOSAL
+    type: str  # DEBATE | FINISH_DEBATE | PROPOSE_BUDGET | VOTE | ABSTAIN_FROM_PROPOSAL
 
     # DEBATE fields
     message: str | None = None
+
+    # FINISH_DEBATE fields
+    reason: str | None = None
 
     # PROPOSE_BUDGET fields
     department: str | None = None
@@ -96,7 +100,7 @@ class ParliamentaryAction(Action):
             d["justification"] = self.justification or ""
         elif self.type == "VOTE":
             d["proposal_id"] = self.proposal_id or ""
-            d["vote"] = self.vote or "ABSTAIN"
+            d["vote"] = str(self.vote) if self.vote else "ABSTAIN"
         elif self.type == "ABSTAIN_FROM_PROPOSAL":
             d["department"] = self.department or self.agent_id
         return d

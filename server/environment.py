@@ -86,12 +86,12 @@ class NationEnvironment(Environment):
         """
         Process one agent action in the current phase.
         """
-        # Special case: an empty DEBATE message can be used to signal "pass/finish"
-        if action.type == "DEBATE" and not (action.message or "").strip():
+        # Special case: FINISH_DEBATE or empty DEBATE message can be used to signal "pass/finish"
+        if action.type == "FINISH_DEBATE" or (action.type == "DEBATE" and not (action.message or "").strip()):
             self.game.force_advance_phase()
             next_agent = self._determine_next_agent()
             obs = self._build_observation(agent_id=next_agent)
-            return obs, 0.0, False, False, {"action": "debate_pass"}
+            return obs, 0.0, False, False, {"action": "debate_finish"}
 
         # Convert to engine dict and step
         action_dict = action.to_engine_dict()
@@ -196,9 +196,16 @@ class NationEnvironment(Environment):
         phase = self.game.phase
 
         if phase == Phase.DEBATE:
-            # Cycle through all departments during debate
+            # Cycle through all departments during debate, but cap at 20 messages
             n = len(self.departments)
-            next_idx = len(self.game.debate_messages) % n
+            msg_count = len(self.game.debate_messages)
+            
+            if msg_count >= 18:
+                # Force transition to Proposal phase
+                self.game.force_advance_phase()
+                return self._get_proposal_order()[0]
+                
+            next_idx = msg_count % n
             return self.departments[next_idx]
 
         if phase == Phase.PROPOSAL:
@@ -218,11 +225,17 @@ class NationEnvironment(Environment):
                 # Everyone except the proposer must vote
                 required_votes = len(self.departments) - 1
                 if len(target.votes) < required_votes:
+                    # Find someone who hasn't voted yet and is NOT the proposer
+                    proposer = target.agent_id
                     for dept in self.departments:
-                        if dept == target.agent_id or dept == target.department:
+                        if dept == proposer:
                             continue
                         if dept not in target.votes:
+                            print(f"[DEBUG] Voting on {target.proposal_id}: Proposer={proposer}, NextVoter={dept}")
                             return dept
+            
+            # If we reach here, either no proposals are pending or all are fully voted
+            # Fallback to the first department to avoid returning None
             return self.departments[0]
 
         return self.departments[0]

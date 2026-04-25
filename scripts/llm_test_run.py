@@ -25,9 +25,19 @@ def run_llm_test():
         print("Please copy .env.example to .env and fill in your credentials.")
         return
         
-    print(f"Connecting to HuggingFace using model: {model_id}")
-    
     try:
+        # Create logs directory if not exists
+        os.makedirs("logs", exist_ok=True)
+        log_file = open("logs/inference_test.log", "w", encoding="utf-8")
+
+        def log(msg):
+            print(msg)
+            log_file.write(msg + "\n")
+            log_file.flush()
+
+        log("=== STARTING LLM PARLIAMENTARY TEST ===")
+        log(f"Connecting to HuggingFace using model: {model_id}")
+        
         # Initialize client and environment
         client = HuggingFaceTextGenerationClient(model=model_id, token=token)
         adapter = ParliamentaryLLMAdapter(client=client, model=model_id)
@@ -35,25 +45,22 @@ def run_llm_test():
         env = NationEnvironment(seed=42)
         obs, info = env.reset()
         
-        print(f"\n[Round {obs.round} Started]")
-        print("-" * 40)
+        log(f"\n[Round {obs.round} Started]")
+        log("-" * 40)
         
-        # We will just run for a few steps to see if the LLM can generate valid actions
-        # Increase steps to see more agents participate
-        max_steps = 20
+        max_steps = 50
         step_count = 0
         
         while not env.game.done and step_count < max_steps:
             current_agent = obs.current_agent
             current_phase = obs.phase_name
             
-            print(f"Step {step_count + 1}: Agent '{current_agent}' acting in Phase '{current_phase}'")
+            log(f"Step {step_count + 1}: Agent '{current_agent}' acting in Phase '{current_phase}'")
             
             # Use the adapter to get an action from the LLM
             valid_actions = valid_action_types_for_phase(obs.phase)
             
-            print(f"  Valid Actions: {list(valid_actions)}")
-            print("  Waiting for LLM response...")
+            log(f"  Valid Actions: {list(valid_actions)}")
             
             try:
                 action = adapter.act(
@@ -61,11 +68,11 @@ def run_llm_test():
                     valid_actions=valid_actions,
                     agent_id=current_agent
                 )
-                print(f"  LLM Action Generated: {action}")
+                log(f"  LLM Action Generated: {action}")
             except Exception as e:
                 import traceback
-                print(f"  [ERROR] LLM failed to generate valid action:")
-                traceback.print_exc()
+                log(f"  [ERROR] LLM failed to generate valid action: {e}")
+                log(traceback.format_exc())
                 break
                 
             from server.models import ParliamentaryAction
@@ -78,12 +85,17 @@ def run_llm_test():
             # Step the environment
             obs, reward, terminated, truncated, info = env.step(p_action)
             step_count += 1
-            print("-" * 40)
+            log("-" * 40)
             
+            if terminated:
+                log(f"GAME OVER: {info.get('termination_reason', 'Unknown')}")
+                break
+        
+        log(f"\n=== TEST RUN COMPLETE (Steps: {step_count}) ===")
+        log_file.close()
+        
     except Exception as e:
         print(f"Initialization Error: {e}")
-        
-    print("\n=== TEST RUN COMPLETE ===")
 
 if __name__ == "__main__":
     run_llm_test()

@@ -28,5 +28,16 @@ class LLMAbstainAction(BaseModel):
     """Schema for abstaining from proposing a budget."""
     type: Literal["ABSTAIN_FROM_PROPOSAL"] = Field(description="The action type. Must be 'ABSTAIN_FROM_PROPOSAL'.")
 
+class LLMFinishDebateAction(BaseModel):
+    """Schema for ending the debate phase early."""
+    type: Literal["FINISH_DEBATE"] = Field(description="The action type. Must be 'FINISH_DEBATE'.")
+    reason: str = Field(description="Brief reason for ending the debate (e.g., 'Consensus reached').")
+
 # Union type for parsing
-LLMAction = Union[LLMDebateAction, LLMProposeBudgetAction, LLMVoteAction, LLMAbstainAction]
+LLMAction = Union[
+    LLMDebateAction, 
+    LLMProposeBudgetAction, 
+    LLMVoteAction, 
+    LLMAbstainAction,
+    LLMFinishDebateAction
+]

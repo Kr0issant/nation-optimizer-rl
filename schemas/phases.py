@@ -17,7 +17,7 @@ class Phase(IntEnum):
 
 ACTION_TYPES_BY_PHASE = {
     Phase.EVENT_REVELATION: frozenset(),
-    Phase.DEBATE: frozenset({"DEBATE"}),
+    Phase.DEBATE: frozenset({"DEBATE", "FINISH_DEBATE"}),
     Phase.PROPOSAL: frozenset({"PROPOSE_BUDGET", "ABSTAIN_FROM_PROPOSAL"}),
     Phase.VOTING: frozenset({"VOTE"}),
     Phase.BUDGET_EXECUTION: frozenset(),

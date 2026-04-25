@@ -14,7 +14,8 @@ from schemas.actions import (
     ProposeBudgetAction,
     VoteAction,
     VoteChoice,
-    AbstainProposalAction
+    AbstainProposalAction,
+    FinishDebateAction
 )
 from llm_integration.schemas import LLMAction
 
@@ -73,5 +74,8 @@ def parse_action_json(payload: str | dict[str, Any]) -> Action:
 
     elif action_type == "ABSTAIN_FROM_PROPOSAL":
         return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
+
+    elif action_type == "FINISH_DEBATE":
+        return FinishDebateAction(type=ActionType.FINISH_DEBATE, reason=parsed_llm_action.reason)
 
     raise ActionParseError(f"Unsupported action type: {action_type}")

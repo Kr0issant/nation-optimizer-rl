@@ -29,10 +29,10 @@ def build_public_observation(observation: Any) -> dict[str, Any]:
         "phase": phase_str,
         "treasury": observation.treasury,
         "event_ledger": [_sanitize_event(event) for event in observation.event_ledger],
-        "proposals": [asdict(proposal) for proposal in observation.proposals],
-        "votes": [asdict(vote) for vote in observation.votes],
+        "proposals": [proposal.model_dump() for proposal in observation.proposals],
+        "votes": [vote.model_dump() for vote in observation.votes],
         "debate_messages": list(observation.debate_messages),
-        "own_department": {"name": observation.own_department.name} if observation.own_department else None,
+        "own_department": observation.own_department.model_dump() if observation.own_department else None,
         "termination": dict(observation.termination) if observation.termination else {},
     }
 
