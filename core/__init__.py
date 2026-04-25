@@ -16,6 +16,14 @@ No framework dependencies.  The entire game can be run with::
 from .config import DEFAULT_CONFIG, GameConfig
 from .events import Event, EventEngine
 from .game import NationGame, StepResult
+from .parliament import (
+    DebateMessage,
+    ParliamentRoundState,
+    Proposal,
+    ProposalAbstention,
+    ResolutionResult,
+    VoteRecord,
+)
 from .population import PopulationTracker
 from .productivity import ProductivityTracker
 from .revenue import calculate_revenue, compute_thresholds, revenue_factor
@@ -26,6 +34,12 @@ from .treasury import Treasury
 __all__ = [
     "NationGame",
     "StepResult",
+    "ParliamentRoundState",
+    "Proposal",
+    "ProposalAbstention",
+    "VoteRecord",
+    "DebateMessage",
+    "ResolutionResult",
     "GameConfig",
     "DEFAULT_CONFIG",
     "Sector",

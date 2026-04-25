@@ -55,23 +55,42 @@ class NationEnvironment(Environment):
         self, seed: Optional[int] = None, **kwargs
     ) -> tuple[ParliamentaryObservation, dict]:
         """
-        Reset the environment. Phase 1 (event revelation) runs automatically.
-        Returns observation ready for Phase 2 (debate).
+        Executes one step in the environment.
+        Applies the Softmax Boundary to map continuous bids to allocations.
         """
-        super().reset(seed=seed)
-        if seed is not None:
-            self.game = NationGame(seed=seed)
-        else:
-            self.game.reset()
+        # The Softmax Boundary
+        raw_bids = np.array(action.bids)
+        
+        # Subtract max for numerical stability before exp
+        raw_bids_stable = raw_bids - np.max(raw_bids)
+        exp_bids = np.exp(raw_bids_stable)
+        percentages = exp_bids / np.sum(exp_bids)
 
-        self._retry_count = 0
-        self._round_reward = 0.0
+        # Retrieve the current treasury from the game's internal state
+        # Subtract a tiny epsilon to ensure floating point math during sum() doesn't exceed the balance
+        treasury = self.game.state["treasury"] - 1e-6
 
-        # Phase 1 already ran inside game.reset() → _start_round()
-        # Engine starts in Phase 1. We need to advance to Phase 2 for debate.
-        self.game.force_advance_phase()
+        # Calculate exact dollar allocations, avoiding floating point overflow
+        allocations_dict = {}
+        allocated = 0.0
+        for i, sector in enumerate(self.sectors):
+            if i == len(self.sectors) - 1:
+                allocations_dict[sector] = float(treasury - allocated)
+            else:
+                amt = float(percentages[i] * treasury)
+                allocations_dict[sector] = amt
+                allocated += amt
 
-        obs = self._build_observation(agent_id=self.departments[0])
+        # Step the core deterministic engine
+        result = self.game.step(allocations_dict)
+
+        # Convert result back to OpenEnv format
+        state = self._get_state(result.to_dict())
+        reward = result.reward.total
+        
+        # Gym/OpenEnv standard: (obs, reward, terminated, truncated, info)
+        terminated = result.done
+        truncated = False
         info = {
             "episode_started": True,
             "round": self.game.round,
