@@ -22,6 +22,8 @@ class ProposalObservation:
     department: str
     amount: float
     status: str = "pending"
+    agent_id: str | None = None
+    votes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

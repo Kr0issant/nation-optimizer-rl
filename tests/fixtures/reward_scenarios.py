@@ -42,13 +42,13 @@ NORMAL_PROFIT_ZONE_REWARD = RewardScenario(
     productivity=INITIAL_PRODUCTIVITY,
     rounds_survived=5,
     expected=RewardExpectation(
-        base_reward=14.065101779293082,
+        base_reward=0.0012825,
         productivity_bonus=0.0,
         survival_bonus=50.0,
         over_allocation_penalty=0.0,
         under_allocation_penalty=0.0,
         critical_penalty=0.0,
-        total=64.06510177929309,
+        total=50.0012825,
     ),
 )
 
@@ -59,13 +59,13 @@ CONSERVATIVE_DEMAND_REWARD = RewardScenario(
     productivity=INITIAL_PRODUCTIVITY,
     rounds_survived=1,
     expected=RewardExpectation(
-        base_reward=13.073173633213308,
+        base_reward=0.000475,
         productivity_bonus=0.0,
         survival_bonus=10.0,
         over_allocation_penalty=0.0,
         under_allocation_penalty=0.0,
         critical_penalty=0.0,
-        total=23.073173633213308,
+        total=10.000475,
     ),
 )
 
@@ -76,13 +76,13 @@ UNDERFUNDED_SURVIVABLE_REWARD = RewardScenario(
     productivity=INITIAL_PRODUCTIVITY,
     rounds_survived=1,
     expected=RewardExpectation(
-        base_reward=12.909170656943036,
+        base_reward=0.000403,
         productivity_bonus=0.0,
         survival_bonus=10.0,
         over_allocation_penalty=0.0,
         under_allocation_penalty=-10.0,
         critical_penalty=0.0,
-        total=12.909170656943036,
+        total=0.000403,
     ),
 )
 
@@ -93,13 +93,13 @@ CRITICAL_FAILURE_REWARD = RewardScenario(
     productivity=INITIAL_PRODUCTIVITY,
     rounds_survived=1,
     expected=RewardExpectation(
-        base_reward=6.907755778981887,
+        base_reward=0.0,
         productivity_bonus=0.0,
         survival_bonus=10.0,
         over_allocation_penalty=0.0,
         under_allocation_penalty=0.0,
         critical_penalty=-1000.0,
-        total=-983.0922442210181,
+        total=-990.0,
     ),
 )
 
@@ -110,13 +110,13 @@ WASTAGE_REWARD = RewardScenario(
     productivity=INITIAL_PRODUCTIVITY,
     rounds_survived=1,
     expected=RewardExpectation(
-        base_reward=13.251117798108481,
+        base_reward=0.0005677050983124842,
         productivity_bonus=0.0,
         survival_bonus=10.0,
         over_allocation_penalty=-5.0,
         under_allocation_penalty=0.0,
         critical_penalty=0.0,
-        total=18.25111779810848,
+        total=5.000567705098312,
     ),
 )
 

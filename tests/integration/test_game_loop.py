@@ -156,7 +156,7 @@ def test_vote_action_only_accepted_in_phase_4() -> None:
 
     game = make_game()
     submit_safe_proposals(game)
-    proposal_id = game.proposals[0].proposal_id
+    proposal_id = next(item.proposal_id for item in game.proposals if item.department != "Health")
 
     accepted_result = game.step(vote("Health", proposal_id))
 
@@ -261,11 +261,9 @@ def test_rejected_proposal_allocates_zero() -> None:
     health_proposal = game.proposals[0]
     game.step(
         [
-            vote("Social", health_proposal.proposal_id, VoteChoice.NO),
-            vote("Agriculture", health_proposal.proposal_id, VoteChoice.NO),
-            vote("Education", health_proposal.proposal_id, VoteChoice.NO),
-            vote("Defense", health_proposal.proposal_id, VoteChoice.NO),
-            vote("Commerce", health_proposal.proposal_id, VoteChoice.NO),
+            vote(department, health_proposal.proposal_id, VoteChoice.NO)
+            for department in DEPARTMENTS
+            if department != "Health"
         ]
     )
 
@@ -308,16 +306,14 @@ def test_sequential_treasury_depletion_rejects_later_proposal() -> None:
 
     game.step(
         [
-            vote("Agriculture", social_proposal.proposal_id),
-            vote("Health", social_proposal.proposal_id),
-            vote("Education", social_proposal.proposal_id),
-            vote("Defense", social_proposal.proposal_id),
-            vote("Commerce", social_proposal.proposal_id),
-            vote("Social", health_proposal.proposal_id),
-            vote("Agriculture", health_proposal.proposal_id),
-            vote("Education", health_proposal.proposal_id),
-            vote("Defense", health_proposal.proposal_id),
-            vote("Commerce", health_proposal.proposal_id),
+            vote(department, social_proposal.proposal_id)
+            for department in DEPARTMENTS
+            if department != "Social"
+        ]
+        + [
+            vote(department, health_proposal.proposal_id)
+            for department in DEPARTMENTS
+            if department != "Health"
         ]
     )
     game.step()
@@ -355,11 +351,9 @@ def test_critical_failure_after_revenue_round_uses_zero_current_revenue() -> Non
     health_proposal = game.proposals[0]
     game.step(
         [
-            vote("Social", health_proposal.proposal_id),
-            vote("Agriculture", health_proposal.proposal_id),
-            vote("Education", health_proposal.proposal_id),
-            vote("Defense", health_proposal.proposal_id),
-            vote("Commerce", health_proposal.proposal_id),
+            vote(department, health_proposal.proposal_id)
+            for department in DEPARTMENTS
+            if department != "Health"
         ]
     )
     result = game.step()
