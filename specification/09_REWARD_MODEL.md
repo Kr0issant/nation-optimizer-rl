@@ -1,6 +1,6 @@
 # 09 — Reward Model
 
-> Defines the exact reward function for reinforcement learning, measuring "prosperity" as GDP per capita equivalent.
+> Defines the exact reward function for reinforcement learning, measuring "prosperity" as per-capita income with piecewise revenue incentives.
 
 ---
 
@@ -8,7 +8,7 @@
 
 - **Collective reward only**: ALL agents receive identical reward at each step
 - No individual component reward
-- Rationale: Incentivizes cooperation over self-interest; mirrors communist principle of collective advancement
+- Rationale: Incentivizes cooperation over self-interest; mirrors collective advancement principle
 
 ---
 
@@ -19,14 +19,15 @@ Prosperity is defined as the economic output per citizen, analogous to GDP per c
 ### Primary Formula (Recommended)
 
 ```
-Prosperity_t = (Total_Revenue_t + Treasury_Balance_t) / Population_t
+Prosperity_t = Total_Revenue_t / Population_t
 ```
 
 Where:
-- `Total_Revenue_t` = sum of all department revenues in round t (from Economy Model)
-- `Treasury_Balance_t` = treasury balance at end of round t
-- `Population_t` = total population at round t (grows with growth rate)
-- Population starts at 1000 and grows at 0.5% per round (plus health bonus, minus crisis penalty)
+- `Total_Revenue_t` = sum of all department revenues in round t (from Economy Model piecewise curve)
+- `Population_t` = total population at round t
+- Population starts at 1,000,000 and grows based on productivity and health
+
+**Key difference from old model**: Dividing by population (not treasury) gives per-capita income. The piecewise revenue curve means agents can optimize for profit zone allocations rather than exact demand matching.
 
 ---
 
@@ -35,7 +36,7 @@ Where:
 ### Per-Step Reward
 
 ```
-R_t = Base_Reward_t + Productivity_Bonus_t + Efficiency_Bonus_t + Survival_Bonus_t + Allocation_Penalty_t - Bankruptcy_Penalty_t
+R_t = Base_Reward_t + Productivity_Bonus_t + Survival_Bonus_t + Allocation_Penalty_t - Critical_Penalty_t
 ```
 
 ### Component Definitions
@@ -43,68 +44,54 @@ R_t = Base_Reward_t + Productivity_Bonus_t + Efficiency_Bonus_t + Survival_Bonus
 #### Base Reward
 
 - `Base_Reward_t = Prosperity_t`
-- Measures current prosperity level
-- Higher prosperity = higher reward
+- Measures current prosperity level (revenue per capita)
+- Higher revenue per capita = higher reward
 
 #### Productivity Bonus
 
-- `Productivity_Bonus_t = +10 * Investment_t`
-- Rewards the collective system for actual spending (consumption), not savings
-- Investment = sum(Consumption_d) = total actual spending across all departments
-- Each unit of investment adds 10 to reward
-- Rationale: Productivity rewards actual investment (consumption), not savings
-
-#### Efficiency Bonus
-
-- `Efficiency_Bonus_t = +5 * Count(d where Efficiency_d_t >= 0.9)`
-- Rewards departments operating efficiently (Allocation close to Need)
-- Efficiency: `Efficiency_d = 1.0 - (|Allocation_d - Need_d| / Need_d)`
-- Perfect efficiency = 1.0 when `Allocation = Need`
-- Threshold: efficiency >= 0.9 (allocation within 10% of Need)
-- Each efficient department adds 5 to reward
+- `Productivity_Bonus_t = +50 × (Productivity_t - 1.0)`
+- Rewards high national productivity
+- Productivity is **persistent** across rounds, so this bonus rewards long-term good budgeting decisions
+- If Productivity = 1.5: bonus = +25
+- If Productivity = 2.0: bonus = +50 (maximum)
+- If Productivity = 0.5: bonus = -25 (productivity penalty)
+- Rationale: Sustained profitable allocation (avg revenue factor > 1.0) pushes productivity upward, which then amplifies all revenue generation
 
 #### Survival Bonus
 
-- `Survival_Bonus_t = +1 * Rounds_Survived_t`
-- Encourages longevity and avoids bankruptcy
-- Each round survived adds 1 to reward (accumulates over episode)
+- `Survival_Bonus_t = +10 × Rounds_Survived_t`
+- Encourages longevity and avoiding critical failure
+- Each round survived adds 10 to reward (accumulates over episode)
+- At round 10: survival bonus = 100
+- At round 50: survival bonus = 500
 
-#### Over-Allocation Penalty
+#### Allocation Penalty
 
-- `Over_Allocation_Penalty_t = -5 * Count(d where Allocation_d_t > Need_d_t)`
-- Penalty for departments that over-allocated relative to their Need
-- Rationale: Over-allocation wastes resources that could be used elsewhere
-- Each over-allocated department subtracts 5 from reward
+The piecewise curve creates three allocation zones with different penalty structures:
 
-#### Under-Allocation Penalty
+**Over-Allocation Penalty (Wastage Zone)**
+- `Over_Allocation_Penalty_t = -5 × Count(sectors where Allocation_d > Surplus_d)`
+- Penalty for sectors in the wastage zone (allocation above surplus threshold)
+- Each wastage sector subtracts 5 from reward
+- Rationale: Over-allocation beyond surplus wastes resources, revenue factor drops below 1.0
 
-- `Under_Allocation_Penalty_t = -10 * Count(d where Allocation_d_t < Need_d_t)`
-- Penalty for departments that under-allocated relative to their Need
-- Rationale: Under-funding causes departments to underperform
-- Each under-allocated department subtracts 10 from reward
+**Under-Allocation Penalty (Below Demand but Above Critical)**
+- `Under_Allocation_Penalty_t = -10 × Count(sectors where Critical_d ≤ Allocation_d < Demand_d)`
+- Penalty for sectors between critical and demand (linear growth zone)
+- Each under-funded sector subtracts 10 from reward
+- Rationale: Under-funding causes revenue factor below 1.0, reducing national productivity
 
-#### Bankruptcy Penalty
+**No Penalty Zone: Demand to Surplus**
+- Sectors with `Demand_d ≤ Allocation_d ≤ Surplus_d` receive NO penalty
+- This is the profit zone where revenue factor ranges from 1.0 to 1.8
+- Agents WANT to allocate in this zone, not exactly at demand
 
-- `Bankruptcy_Penalty_t = -1000` if `Treasury_t <= 0` else `0`
-- Large penalty applied when bankruptcy conditions are met
-- Triggers episode termination; all subsequent rewards are 0
+#### Critical Penalty
 
-#### Shutdown Penalty
-
-- `Shutdown_Penalty_t = 0` (no negative penalty when Shutdown triggers)
-- `Survival_Bonus_t` stops accumulating after Shutdown termination
-- `Episode_Total = Sum(R_t for t = 1 to T_shutdown)` (no further rewards after Shutdown)
-- Shutdown does NOT apply the -1000 Bankruptcy penalty
-- Episode ends immediately upon Shutdown; remaining steps receive 0
-
-**Comparison: Shutdown vs Bankruptcy Reward Handling**
-
-| Aspect | Bankruptcy | Shutdown |
-|--------|------------|----------|
-| Special Penalty | -1000 | 0 |
-| Survival Bonus | Stops immediately | Stops immediately |
-| Episode Total | Sum rewards up to t, then 0s | Sum rewards up to T_shutdown |
-| Final Status | BANKRUPTCY | SHUTDOWN |
+- `Critical_Penalty_t = -1000` if `Allocation_d < Critical_d` for ANY sector
+- Large penalty triggers immediate episode termination
+- Final prosperity = `(Treasury + Total_Revenue) / Population` at termination
+- Rationale: Catastrophic failure requires strong disincentive; no recovery possible once below critical
 
 ---
 
@@ -112,7 +99,7 @@ R_t = Base_Reward_t + Productivity_Bonus_t + Efficiency_Bonus_t + Survival_Bonus
 
 ### Per-Step Calculation
 
-- Reward calculated at end of each round (Phase 9: Termination Check)
+- Reward calculated at end of each round after revenue generation
 - Applied immediately to all agents as identical reward
 - Used for RL training signal
 
@@ -120,207 +107,218 @@ R_t = Base_Reward_t + Productivity_Bonus_t + Efficiency_Bonus_t + Survival_Bonus
 
 - `Episode_Total = Sum(R_t for t = 1 to T)`
 - Sum of all per-step rewards across the episode
-- Maximized when episode reaches maximum rounds without bankruptcy
+- Maximized when episode reaches maximum rounds without critical failure
 
-### Bankruptcy Termination
+### Critical Failure Termination
 
-- If bankruptcy occurs at step t:
-  - Reward for step t includes bankruptcy penalty
-  - Steps t+1 through T receive reward = 0
-  - Episode total is capped below potential maximum
+- If critical failure occurs at step t:
+  - Reward for step t includes -1000 critical penalty
+  - Episode terminates immediately
+  - Steps t+1 through T receive 0
 
 ---
 
 ## Alternative Prosperity Formulas
 
-Since prosperity measurement is non-trivial, here are 3 options with trade-offs:
+Since prosperity measurement has trade-offs, here are 3 options:
 
 ### Option A: Revenue-Based (Primary Formula Recommended Above)
 
 ```
-Prosperity_t = (Total_Revenue_t + Treasury_Balance_t) / Population
+Prosperity_t = Total_Revenue_t / Population_t
 ```
 
-- **Pros**: Direct measure of economic activity; aligns with game mechanics
-- **Cons**: Treasury balance can fluctuate based on allocation patterns
-- **Best for**: Balanced growth; rewards both productivity and savings
+- **Pros**: Direct per-capita output; clear signal of economic productivity
+- **Cons**: Does not account for treasury reserves
+- **Best for**: Optimizing revenue generation; rewards efficient allocation
 
-### Option B: Efficiency-Weighted Productivity
-
-```
-Prosperity_t = Sum(Department_Revenue_d_t * Efficiency_Rating_d_t) / Population
-```
-
-- **Pros**: Rewards efficient departments more than inefficient ones
-- **Cons**: Can penalize necessary high-spending departments (Defense during crisis)
-- **Best for**: Optimizing resource allocation; aggressive efficiency focus
-
-### Option C: Surplus-Driven Growth
+### Option B: Efficiency-Weighted Prosperity
 
 ```
-Prosperity_t = (Baseline_Tax + Sum(Surplus_d_t)) / Population
+Prosperity_t = Sum(Revenue_d_t × Revenue_Factor_d_t) / Population_t
 ```
 
-Where:
-- `Baseline_Tax` = 100 (constant)
-- `Sum(Surplus_d_t)` = total system-wide surplus
+- **Pros**: Rewards departments that generate revenue efficiently (high revenue factor)
+- **Cons**: Can undervalue necessary high-spending during crises
+- **Best for**: Allocation optimization; rewards profit zone behavior
 
-- **Pros**: Rewards collective under-spending; encourages frugality
-- **Cons**: May discourage necessary investment in infrastructure
-- **Best for**: Conservative play; prioritizes savings over investment
+### Option C: Treasury-Weighted Prosperity
 
-### Recommendation for Hackathon
+```
+Prosperity_t = (Total_Revenue_t + Treasury_Balance_t) / Population_t
+```
+
+- **Pros**: Includes accumulated reserves; rewards saving
+- **Cons**: May discourage necessary spending during crises
+- **Best for**: Conservative play; balances revenue and savings
+
+### Recommendation
 
 **Use Option A (Primary Formula)** for the following reasons:
-1. Intuitive interpretation: Total economic output divided by population
-2. Balanced incentives: Rewards both productivity (revenue) and savings (treasury)
-3. Stable signal: Less volatile than pure surplus measure
-4. Aligns with RL objectives: Clear gradient toward better states
+1. Per-capita signal aligns with population dynamics (larger population = harder to grow prosperity)
+2. Clear gradient toward profitable allocation (revenue factor > 1.0)
+3. Persistent productivity already handles long-term savings consideration
+4. Aligns with RL objectives: prosperity grows when allocation decisions are sound
+
+---
+
+## Piecewise Revenue Zone Reference
+
+Understanding allocation zones is essential for reward optimization:
+
+| Zone | Allocation Range | Revenue Factor | Reward Treatment |
+|------|-----------------|----------------|------------------|
+| **Critical Failure** | `x < Critical_d` | N/A | GAME OVER (-1000 penalty, episode ends) |
+| **Under-Funded** | `Critical_d ≤ x < Demand_d` | 0 to 1.0 (linear) | -10 per sector (under-allocation penalty) |
+| **Profit Zone** | `Demand_d ≤ x ≤ Surplus_d` | 1.0 to 1.8 (linear) | NO PENALTY (agents want to be here) |
+| **Wastage Zone** | `x > Surplus_d` | 1.8 decaying to 1.0+ | -5 per sector (over-allocation penalty) |
+
+**Key insight**: The profit zone (Demand to Surplus) is where agents should aim allocations. This is approximately 1.0× to 1.5× demand, not exactly 1.0× demand.
 
 ---
 
 ## Numerical Examples
 
-### Example 1: Normal Growth Round (Model A)
+### Example 1: Normal Round with Profit Zone Allocations
 
 **Setup:**
-- 6 departments: Social (Need=60), Agriculture (Need=70), Health (Need=90), Education (Need=80), Defense (Need=100), Commerce (Need=75)
-- Population = 1000
-- Round 1: All allocations match Need exactly
-- Social=60, Agriculture=70, Health=90, Education=80, Defense=100, Commerce=75
-- Treasury balance after allocations = 1525 (1000 initial - 475 allocated)
+- 6 departments: Social (Baseline=60), Agriculture (Baseline=70), Health (Baseline=90), Education (Baseline=80), Defense (Baseline=100), Commerce (Baseline=75)
+- Population = 1,000,000
+- Productivity = 1.0
+- Round 5: All allocations in profit zone (between demand and surplus)
+- No events (event multiplier = 1.0)
 
-**Model A Calculation:**
-- All departments: Allocation = Need, so Consumption = Need
-- Social: Efficiency = 1.0, Investment contribution = 60
-- Agriculture: Efficiency = 1.0, Investment contribution = 70
-- Health: Efficiency = 1.0, Investment contribution = 90
-- Education: Efficiency = 1.0, Investment contribution = 80
-- Defense: Efficiency = 1.0, Investment contribution = 100
-- Commerce: Efficiency = 1.0, Investment contribution = 75
+**Allocation Strategy (150% of demand):**
+- Social: 90, Agriculture: 105, Health: 135, Education: 120, Defense: 150, Commerce: 112.5
+- All above demand, below or at surplus
 
-Total Investment = 475 (sum of all consumption)
-Total Need = 475
+**Threshold Calculation (per department):**
+- Demand_d = Baseline × (Population / 1,000,000) × 1.0 = Baseline
+- Surplus_d = Demand × 1.5 = 1.5 × Baseline
 
-Productivity_Multiplier = 1.0 + (475/475) = 2.0
+**Revenue Factor (all at surplus):**
+- Revenue Factor = 1.8 for all departments (peak profit zone)
 
-Department Revenues:
-- All: Revenue = Consumption * Efficiency * Productivity_Multiplier = Need * 1.0 * 2.0 = 2 * Need
-- Social: 60 * 2 = 120
-- Agriculture: 70 * 2 = 140
-- Health: 90 * 2 = 180
-- Education: 80 * 2 = 160
-- Defense: 100 * 2 = 200
-- Commerce: 75 * 2 = 150
+**Department Revenues:**
+- Social: 90 × 1.8 × 1.0 = 162
+- Agriculture: 105 × 1.8 × 1.0 = 189
+- Health: 135 × 1.8 × 1.0 = 243
+- Education: 120 × 1.8 × 1.0 = 216
+- Defense: 150 × 1.8 × 1.0 = 270
+- Commerce: 112.5 × 1.8 × 1.0 = 202.5
+- Total Revenue = 1282.5
 
-Total Revenue = 950
+**Prosperity:**
+- Prosperity = 1282.5 / 1,000,000 = 0.0012825
 
 **Reward Calculation:**
-
 ```
-Total_Revenue = 950
-Treasury_Balance = 1525
-Population = 1000
-Prosperity = (950 + 1525) / 1000 = 2.475
+Base_Reward = 0.0012825 (prosperity)
+Productivity_Bonus = +50 × (1.0 - 1.0) = 0 (neutral productivity)
+Survival_Bonus = +10 × 5 = +50 (5 rounds survived)
+Over_Allocation_Penalty = -5 × 0 = 0 (no sectors in wastage zone)
+Under_Allocation_Penalty = -10 × 0 = 0 (no sectors below demand)
+Critical_Penalty = 0 (no sector below critical)
 
-Base_Reward = 2.475
-Productivity_Bonus = +10 * 475 = +4750 (investment-driven)
-Efficiency_Bonus = +5 * 6 = +30 (all departments at 1.0 efficiency)
-Survival_Bonus = +1 * 1 = +1
-Over_Allocation_Penalty = 0 (no over-allocation)
-Under_Allocation_Penalty = 0 (no under-allocation)
-Bankruptcy_Penalty = 0 (treasury > 0)
-
-R_t = 2.475 + 4750 + 30 + 1 - 0 - 0 = 4783.475
+R_t = 0.0012825 + 0 + 50 + 0 + 0 - 0 = 50.0012825
 ```
 
-**Result:** Reward = 4783.475 for all agents in this step
-
-Note: The productivity bonus heavily rewards investment (actual consumption). Perfect efficiency across all departments yields maximum efficiency bonus.
+**Result:** Reward = 50.0012825 for all agents. Note the survival bonus dominates; productivity bonus is zero because productivity has not yet changed.
 
 ---
 
-### Example 2: Crisis Management Round (Model A)
+### Example 2: Crisis Round with Under-Funded Sector
 
 **Setup:**
-- 6 departments with baseline needs
-- Population = 1012 (after 2 rounds of growth)
-- War event increases Defense Need from 100 to 250
-- Round 3 allocations: Health=90, Education=80, Defense=200, Social=60, Agriculture=70, Commerce=75
-- Treasury balance = 800 (depleted from crisis spending)
-- Rounds survived = 3
+- Population = 1,010,000 (grew slightly)
+- Productivity = 1.2 (sustained profit zone increased productivity)
+- Round 10: War event increases Defense Need
+- Defense allocation below demand but above critical
 
-**Model A Calculation:**
-- Health: Need=90, Allocation=90, Consumption=90, Efficiency=1.0
-- Education: Need=80, Allocation=80, Consumption=80, Efficiency=1.0
-- Defense: Need=250 (war), Allocation=200, Consumption=200, Efficiency=1.0-(50/250)=0.8
-- Social: Need=60, Allocation=60, Consumption=60, Efficiency=1.0
-- Agriculture: Need=70, Allocation=70, Consumption=70, Efficiency=1.0
-- Commerce: Need=75, Allocation=75, Consumption=75, Efficiency=1.0
+**Allocations:**
+- Social: 60 (at demand), Agriculture: 70 (at demand), Health: 90 (at demand)
+- Education: 80 (at demand), Defense: 80 (below demand=100, but above critical=40)
+- Commerce: 75 (at demand)
 
-Total Investment = 90 + 80 + 200 + 60 + 70 + 75 = 575
-Total Need = 90 + 80 + 250 + 60 + 70 + 75 = 625
+**Threshold Calculation:**
+- Defense: Baseline=100, Demand=100, Critical=40, Surplus=150
 
-Productivity_Multiplier = 1.0 + (575/625) = 1.92
+**Revenue Factors:**
+- Social: 1.0 (at demand)
+- Agriculture: 1.0 (at demand)
+- Health: 1.0 (at demand)
+- Education: 1.0 (at demand)
+- Defense: (80 - 40) / (100 - 40) = 40/60 = 0.667 (linear segment)
+- Commerce: 1.0 (at demand)
 
-Department Revenues:
-- Health: 90 * 1.0 * 1.92 = 172.8
-- Education: 80 * 1.0 * 1.92 = 153.6
-- Defense: 200 * 0.8 * 1.92 = 307.2
-- Social: 60 * 1.0 * 1.92 = 115.2
-- Agriculture: 70 * 1.0 * 1.92 = 134.4
-- Commerce: 75 * 1.0 * 1.92 = 144.0
+**Department Revenues:**
+- Social: 60 × 1.0 × 1.2 = 72
+- Agriculture: 70 × 1.0 × 1.2 = 84
+- Health: 90 × 1.0 × 1.2 = 108
+- Education: 80 × 1.0 × 1.2 = 96
+- Defense: 80 × 0.667 × 1.2 = 64
+- Commerce: 75 × 1.0 × 1.2 = 90
+- Total Revenue = 514
 
-Total Revenue = 1027.2
+**Prosperity:**
+- Prosperity = 514 / 1,010,000 = 0.000509
 
 **Reward Calculation:**
-
 ```
-Total_Revenue = 1027.2
-Treasury_Balance = 800
-Population = 1012
-Prosperity = (1027.2 + 800) / 1012 = 1.806
+Base_Reward = 0.000509 (prosperity)
+Productivity_Bonus = +50 × (1.2 - 1.0) = +10 (elevated productivity)
+Survival_Bonus = +10 × 10 = +100 (10 rounds survived)
+Over_Allocation_Penalty = -5 × 0 = 0 (no wastage)
+Under_Allocation_Penalty = -10 × 1 (Defense below demand) = -10
+Critical_Penalty = 0 (Defense above critical)
 
-Base_Reward = 1.806
-Productivity_Bonus = +10 * 575 = +5750 (high investment during crisis)
-Efficiency_Bonus = +5 * 5 = +25 (5 of 6 departments >= 0.9 efficiency)
-Survival_Bonus = +1 * 3 = +3
-Over_Allocation_Penalty = 0
-Under_Allocation_Penalty = -10 * 1 (Defense: 200 < 250) = -10
-Bankruptcy_Penalty = 0
-
-R_t = 1.806 + 5750 + 25 + 3 - 10 - 0 = 5769.806
+R_t = 0.000509 + 10 + 100 - 10 - 0 = 100.000509
 ```
 
-**Result:** Reward = 5769.806 for all agents in this step. Note Defense is underfunded due to crisis, incurring under-allocation penalty.
+**Result:** Reward = 100.000509. Defense under-funding costs 10 points, but high productivity and survival bonuses more than compensate.
 
 ---
 
-### Example 3: Bankruptcy Scenario (Model A)
+### Example 3: Critical Failure Round (Game Over)
 
 **Setup:**
-- Treasury balance drops to 0 during Phase 5
-- Total Allocation = 600, Treasury before allocation = 400
-- Bankruptcy triggered: sum(Allocation) > Treasury
+- Treasury = 800
+- Population = 1,020,000
+- Productivity = 0.8 (sustained losses decreased productivity)
+- Round 15: Commerce allocation severely cut due to budget constraints
+- Commerce allocation below critical threshold
 
-**Reward Calculation:**
+**Critical Failure Scenario:**
+- Commerce: Baseline=75, Demand=75, Critical=30
+- Allocation = 25 (below critical of 30)
+
+**Revenue Check:**
+- Allocation (25) < Critical (30)
+- CRITICAL FAILURE: Episode terminates immediately
+
+**Reward at Termination:**
+```
+Base_Reward = Prosperity_t (calculated before termination)
+Productivity_Bonus = +50 × (0.8 - 1.0) = -10 (low productivity)
+Survival_Bonus = +10 × 15 = +150 (15 rounds survived)
+Over_Allocation_Penalty = 0 (failure occurs before zone calculation)
+Under_Allocation_Penalty = 0 (failure occurs before zone calculation)
+Critical_Penalty = -1000 (sector below critical)
+
+R_t = Base_Reward + Productivity_Bonus + Survival_Bonus - 1000
+```
+
+Assume treasury and revenue before failure:
+- Treasury at termination = 800
+- Revenue generated = 0 (commerce failed before generating revenue)
+- Final prosperity = (800 + 0) / 1,020,000 = 0.000784
+- Base_Reward = 0.000784
 
 ```
-Prosperity = (revenue generated before bankruptcy + treasury) / population
-Suppose: Total_Revenue = 200, Treasury_Balance = 0, Population = 1000
-Prosperity = (200 + 0) / 1000 = 0.2
-
-Base_Reward = 0.2
-Productivity_Bonus = +10 * Investment (say 400) = +4000
-Efficiency_Bonus = +5 * 2 = +10
-Survival_Bonus = +1 * 2 = +2
-Under_Allocation_Penalty = -10 * 3 = -30
-Bankruptcy_Penalty = -1000
-
-R_t = 0.2 + 4000 + 10 + 2 - 30 - 1000 = 2982.2
+R_15 = 0.000784 + (-10) + 150 - 1000 = -859.999216
 ```
 
-**Result:** Despite negative bankruptcy penalty, reward is positive because productivity bonus (investment-driven) and survival bonus accumulated before bankruptcy. Episode terminated; remaining steps receive 0.
+**Result:** Large negative reward of approximately -860 due to critical penalty. Episode terminates; no further rewards accumulated.
 
 ---
 
@@ -329,26 +327,64 @@ R_t = 0.2 + 4000 + 10 + 2 - 30 - 1000 = 2982.2
 | Component | Formula | Range |
 |-----------|---------|-------|
 | Base Reward | `Prosperity_t` | (-inf, +inf) |
-| Productivity Bonus | `+10 * Investment_t` | [0, +inf) |
-| Efficiency Bonus | `+5 * Count(Efficiency_d_t >= 0.9)` | [0, +inf) |
-| Survival Bonus | `+1 * Rounds_Survived_t` | [0, +inf) |
-| Over-Allocation Penalty | `-5 * Count(Allocation_d_t > Need_d_t)` | (-inf, 0] |
-| Under-Allocation Penalty | `-10 * Count(Allocation_d_t < Need_d_t)` | (-inf, 0] |
-| Bankruptcy Penalty | `-1000 if bankrupt else 0` | {-1000, 0} |
-
-Where `Efficiency_d_t = 1.0 - (|Allocation_d_t - Need_d_t| / Need_d_t)` and `Investment_t = sum(Consumption_{d,t})`
+| Productivity Bonus | `+50 × (Productivity_t - 1.0)` | (-25, +50) |
+| Survival Bonus | `+10 × Rounds_Survived_t` | [0, +inf) |
+| Over-Allocation Penalty | `-5 × Count(sectors where Allocation > Surplus)` | (-inf, 0] |
+| Under-Allocation Penalty | `-10 × Count(sectors where Critical ≤ Allocation < Demand)` | (-inf, 0] |
+| Critical Penalty | `-1000 if any sector below Critical else 0` | {-1000, 0} |
 
 ---
 
 ## Design Rationale
 
-- **Collective reward** aligns with parliamentary cooperation requirement
-- **Prosperity as GDP per capita** provides intuitive, economically grounded signal
-- **Model A (Government Budget Execution)**: Treasury only pays for actual consumption
-- **Productivity bonus** incentivizes unspent allocation returning to treasury (treasury return)
-- **Efficiency bonus** rewards accurate budgeting: agents want `Allocation ≈ Need`
-- **Over-allocation penalty** discourages wasteful spending (Allocation > Need)
-- **Under-allocation penalty** discourages under-funding critical departments
-- **Survival bonus** discourages reckless behavior that triggers bankruptcy
-- **Bankruptcy penalty** creates strong incentive to avoid treasury depletion
-- **No individual component** prevents zero-sum competition between ministers
+### Collective Reward Alignment
+
+- All agents receive identical reward: aligns incentives toward cooperative budgeting
+- Individual department performance affects collective reward through revenue generation
+
+### Profit Zone Incentive
+
+- The piecewise curve creates a profit zone between demand and surplus
+- Agents are rewarded for allocating moderately above demand (1.0× to 1.5×) rather than exactly at demand
+- This differs fundamentally from old linear efficiency penalty where any deviation was penalized
+
+### Persistent Productivity Connection
+
+- Productivity persists across rounds, creating long-term consequence
+- Sustained profit zone (avg revenue factor > 1.0) pushes productivity toward 2.0
+- High productivity amplifies all revenue generation, creating compounding rewards
+- This connects budget decisions to multi-round strategy, not just single-round optimization
+
+### Critical Threshold Severity
+
+- Below critical = immediate game over
+- Strong disincentive ensures agents maintain minimum viable funding across all sectors
+- Survival bonus accumulates faster than critical penalty recovery is possible
+
+### Population Dynamics Impact
+
+- Per-capita prosperity means population growth makes prosperity harder to increase
+- Birth rate tied to productivity: high productivity = faster population growth
+- Population growth increases demand across all sectors, requiring more total allocation
+- Balanced approach needed: enough revenue to grow prosperity despite larger population
+
+---
+
+## Comparison: Old vs New Reward Model
+
+| Aspect | Old Model | New Model |
+|--------|-----------|-----------|
+| Prosperity | `(Revenue + Treasury) / Population` | `Revenue / Population` |
+| Base Reward | Prosperity | Prosperity |
+| Productivity Bonus | `+10 × Investment` (consumption-based) | `+50 × (Productivity - 1.0)` (persistent) |
+| Efficiency Zone | `Allocation ≈ Need` (exact match) | `Demand ≤ Allocation ≤ Surplus` (profit zone) |
+| Over-Allocation | `-5 × Count(Allocation > Need)` | `-5 × Count(Allocation > Surplus)` (wastage zone only) |
+| Under-Allocation | `-10 × Count(Allocation < Need)` | `-10 × Count(Critical ≤ Allocation < Demand)` |
+| Failure Mode | Bankruptcy (treasury ≤ 0) | Critical Failure (any sector < Critical) |
+| Penalty Severity | -1000 for bankruptcy | -1000 for critical failure |
+
+**Key shift**: The new model rewards profit zone behavior rather than exact demand matching. Agents can target ~1.3× demand for peak revenue factor of 1.8 without penalty.
+
+---
+
+(End of file - total 354 lines)

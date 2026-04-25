@@ -29,6 +29,8 @@ The environment exists to:
 - **Model hidden-information scenarios** where event costs are known only to the environment, forcing agents to reason under uncertainty
 - **Benchmark multi-agent cooperation** against baselines (random allocation, greedy agents)
 - **Generate interpretable episodes** where agent reasoning and parliamentary deliberation are observable
+- **Time scale**: Each round represents 3 months (quarterly budgeting). A full episode spans 12.5 years (50 quarters)
+- **Piecewise revenue model**: The profit zone (Demand to Surplus) rewards moderate over-investment; agents must balance staying above Demand (for revenue factor > 1.0) against avoiding Wastage (beyond which revenue factor falls below 1.0)
 
 ## Target Audience
 
@@ -47,6 +49,7 @@ This system is NOT:
 - A mechanism for training adversarial or deceptive agent behaviors
 - A realistic political simulation with inter-ministry private communication
 - A tool for exploring agent self-interest or profit-maximization
+- A simulation with private sector or market competition
 
 ## Core Mechanics Summary
 

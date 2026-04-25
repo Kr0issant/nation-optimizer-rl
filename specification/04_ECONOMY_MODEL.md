@@ -1,17 +1,18 @@
 # 04 — Economy Model
 
-> Defines the complete economic engine: treasury calculation, revenue generation, treasury surplus, and bankruptcy conditions.
+> Defines the complete economic engine: treasury calculation, revenue generation, productivity system, population dynamics, and critical failure conditions.
 
 ---
 
 ## Starting Conditions
 
 - **Initial Treasury**: 1000 units
-- **Baseline Tax Revenue**: 100 units per round
-- **Number of Departments**: Set at episode initialization (even number: 4, 6, 8, etc.)
-- **Initial Department Efficiency Rating**: 1.0 for all departments
-- **Initial Department Treasury Surplus**: 0 for all departments (treasury surplus is central, not department-level)
-- **Baseline Consumption per Department** (v1):
+- **Baseline Tax**: 100 units per round (constant, not tied to revenue)
+- **Initial Population**: 1,000,000 (Pop₀)
+- **Initial Productivity**: 1.0
+- **Productivity Bounds**: [0.5, 2.0]
+- **Number of Departments**: Set at episode initialization (v1: 6 departments)
+- **v1 Department Baselines**:
   - Social/Municipal: 60
   - Agriculture: 70
   - Health: 90
@@ -21,417 +22,513 @@
 
 ---
 
+## Threshold Calculation
+
+All thresholds scale with population and events. The four key thresholds are:
+
+### Demand Threshold
+
+- `Demand_d = Baseline_d × (Population_t / Pop₀) × Event_Multiplier`
+
+Where:
+- `Baseline_d` = fixed baseline per department
+- `Population_t` = current population
+- `Pop₀ = 1,000,000` (initial population)
+- `Event_Multiplier` = sector-specific event multiplier from Event System
+
+### Critical Threshold
+
+- `Critical_d = Demand_d × 0.4`
+
+This is the minimum viable allocation. Below this: **GAME OVER**.
+
+### Surplus Threshold
+
+- `Surplus_d = Demand_d × 1.5`
+
+The peak profit zone. Revenue factor reaches 1.8 here.
+
+### Wastage Threshold
+
+- `Wastage_d = Demand_d × 2.5`
+
+Revenue factor returns to 1.0 (break-even). Beyond this: exponential decay.
+
+---
+
+## Revenue Function (Piecewise)
+
+The revenue factor determines how efficiently allocation converts to revenue.
+
+### Revenue Factor Formula
+
+```
+         ⎧ None                           if x < Critical_d          (CRITICAL FAILURE)
+         ⎪
+RF(x) =  ⎨ (x - Critical_d) / (Demand_d - Critical_d)   if Critical_d ≤ x < Demand_d
+         ⎪
+         ⎩ 1.0 + 0.8 × (x - Demand_d) / (Surplus_d - Demand_d)   if Demand_d ≤ x ≤ Surplus_d
+         ⎪
+         ⎩ 1.8 × exp(-k × (x - Surplus_d))   if x > Surplus_d
+
+where k = ln(1.8) / (Wastage_d - Surplus_d)
+```
+
+### Revenue Factor Diagram
+
+```
+Revenue Factor (y)
+    │
+1.8 ┤        C ╭────╮
+    │         ╱      ╲
+1.0 ┤────────B        D────
+    │       ╱          ╲
+  0 ┤──────A            ╲
+    │
+    └──────┬────┬──────┬────→ Allocation (x)
+         Critical Demand Surplus Wastage
+
+A (Critical): Revenue factor = 0, below = game over
+B (Demand): Revenue factor = 1.0 (break-even)
+C (Surplus): Revenue factor = 1.8 (peak profit)
+D (Wastage): Revenue factor = 1.0 (break-even again)
+```
+
+### Segment Behavior
+
+- **A→B (Critical to Demand)**: Linear growth from 0 to 1.0. Underfunded but survivable.
+- **B→C (Demand to Surplus)**: Linear growth from 1.0 to 1.8. The profit zone.
+- **C→D (Surplus to Wastage)**: Exponential decay from 1.8 to 1.0. Over-investment penalized.
+- **D→∞ (Beyond Wastage)**: Exponential decay below 1.0. Severe penalty for waste.
+
+### Revenue Factor Lookup Table
+
+| Allocation (% of Demand) | Revenue Factor | Interpretation |
+|--------------------------|----------------|-----------------|
+| 0-39% | FAIL | Critical failure (game over) |
+| 40% | 0 | At critical threshold (break-even) |
+| 50% | 0.25 | Linear segment mid-point |
+| 100% | 1.0 | At demand (break-even) |
+| 150% | 1.8 | At surplus (peak profit) |
+| 250% | 1.0 | At wastage (break-even again) |
+| 300%+ | <1.0 | Beyond wastage (loss) |
+
+### Python Implementation
+
+```python
+import math
+
+def revenue_factor(x, critical, demand, surplus, wastage):
+    if x < critical:
+        return None  # CRITICAL FAILURE: episode terminates
+    elif x < demand:
+        # Segment A→B: Linear from (critical, 0) to (demand, 1.0)
+        return (x - critical) / (demand - critical)
+    elif x <= surplus:
+        # Segment B→C: Linear from (demand, 1.0) to (surplus, 1.8)
+        t = (x - demand) / (surplus - demand)
+        return 1.0 + 0.8 * t
+    else:
+        # Segment C→D→beyond: Exponential decay from (surplus, 1.8)
+        k = math.log(1.8) / (wastage - surplus)
+        return 1.8 * math.exp(-k * (x - surplus))
+```
+
+---
+
+## Department Revenue
+
+### Core Formula
+
+- `Department_Revenue_d = Allocation_d × Revenue_Factor_d × Productivity_t`
+
+Key difference from old model: Revenue is based on **allocation**, not consumption. A department receives revenue based on its budget allocation, multiplied by how efficiently that allocation is used.
+
+### Revenue Calculation Algorithm
+
+```python
+def calculate_department_revenue(allocation, baseline, population, pop_0, event_multiplier, productivity):
+    # Calculate thresholds
+    demand = baseline * (population / pop_0) * event_multiplier
+    critical = demand * 0.4
+    surplus = demand * 1.5
+    wastage = demand * 2.5
+    
+    # Calculate revenue factor
+    rf = revenue_factor(allocation, critical, demand, surplus, wastage)
+    
+    if rf is None:
+        return None  # CRITICAL FAILURE - episode terminates
+    
+    # Calculate revenue (same round)
+    revenue = allocation * rf * productivity
+    
+    return revenue
+```
+
+---
+
+## Critical Threshold (Game-Over Condition)
+
+### Immediate Termination
+
+If `Allocation_d < Critical_d` for **ANY** department, the episode terminates immediately with **CRITICAL FAILURE**.
+
+### Critical Failure Check
+
+- Checked immediately after budget allocation (Phase 5)
+- Any single department below critical triggers failure
+- Final prosperity = `(Treasury + sum(Revenue)) / Population`
+
+### Critical Threshold Behavior
+
+| Scenario | Allocation | Critical | Result |
+|----------|------------|----------|--------|
+| Severe underfunding | 30% of demand | 40% of demand | GAME OVER |
+| Moderate underfunding | 40% of demand | 40% of demand | Break-even at 0 |
+| Adequate funding | 50% of demand | 40% of demand | Survives |
+| Well funded | 100% of demand | 40% of demand | Thrives |
+| Over funded | 150% of demand | 40% of demand | Peak profit zone |
+
+---
+
+## Persistent Productivity System
+
+Productivity persists across rounds, creating long-term consequences for economic decisions.
+
+### State Variable
+
+- `Productivity_t = clamp(Productivity_{t-1} + ΔProductivity, 0.5, 2.0)`
+
+Where:
+- `Productivity_0 = 1.0` (initial at episode start)
+- `Min_Productivity = 0.5`
+- `Max_Productivity = 2.0`
+
+### Delta Productivity
+
+- `ΔProductivity = 0.05 × (Avg_Revenue_Factor - 1.0)`
+
+Where:
+- `Avg_Revenue_Factor = mean(Revenue_Factor_d for all departments)`
+
+### Productivity Update Algorithm
+
+```python
+def update_productivity(previous_productivity, revenue_factors):
+    avg_rf = sum(revenue_factors) / len(revenue_factors)
+    delta = 0.05 * (avg_rf - 1.0)
+    new_productivity = previous_productivity + delta
+    return max(0.5, min(2.0, new_productivity))
+```
+
+### Productivity Behavior Table
+
+| Avg Revenue Factor | Delta | Productivity Change | Interpretation |
+|--------------------|-------|---------------------|----------------|
+| 1.8 (peak) | +0.04 | Increases toward max | All sectors highly profitable |
+| 1.5 | +0.025 | Moderate increase | Sectors moderately profitable |
+| 1.0 | 0 | No change | Break-even state |
+| 0.5 | -0.025 | Moderate decrease | Sectors at loss |
+| 0.0 (critical) | -0.05 | Large decrease toward min | Sectors failing |
+
+### Why Persistence Matters
+
+- Small changes compound over 50 rounds
+- A sustained profit zone (avg rf > 1.0) pushes productivity toward 2.0
+- A sustained loss zone (avg rf < 1.0) pulls productivity toward 0.5
+- Bounded to prevent runaway or collapse
+
+---
+
+## Population Dynamics
+
+Population grows or shrinks based on productivity and crisis occurrence.
+
+### Core Formula
+
+- `Population_t = Population_{t-1} × (1 + Birth_Rate - Death_Rate)`
+
+### Birth Rate
+
+- `Birth_Rate = 0.005 × Productivity_t`
+
+Where:
+- Base birth rate = 0.005 (0.5% per round)
+- Higher productivity leads to higher birth rate
+
+### Death Rate
+
+- `Death_Rate = 0.002 + Crisis_Penalty`
+
+Where:
+- Base death rate = 0.002 (0.2% per round)
+- `Crisis_Penalty = 0.01` if critical event occurred in round t
+
+### Population Update Algorithm
+
+```python
+def update_population(previous_population, productivity, crisis_occurred):
+    base_birth = 0.005
+    base_death = 0.002
+    crisis_penalty = 0.01 if crisis_occurred else 0.0
+    
+    birth_rate = base_birth * productivity
+    death_rate = base_death + crisis_penalty
+    
+    new_population = previous_population * (1 + birth_rate - death_rate)
+    return round(new_population)
+```
+
+### Initial Conditions
+
+- `Population_0 = 1,000,000`
+
+---
+
 ## Treasury Calculation
 
-### Core Treasury Formula
+Treasury updates at the end of each round based on allocations, revenues, and baseline tax.
 
-At the start of each round t (after Phase 7 of round t-1), treasury is calculated as:
+### Treasury Update Formula
 
-- `Treasury_t = Baseline_Tax_t + Productivity_Bonus_{t-1} + Sum(Department_Revenues_{t-1}) + Treasury_Return_{t-1}`
+- `Treasury_t = Treasury_{t-1} + Baseline_Tax + Sum(Department_Revenues_t) - Sum(Allocation_d)`
 
 Where:
-- `Baseline_Tax_t = 100 + 0.1 * Total_Revenue_{t-1}` (linked to economic activity)
-- `Productivity_Bonus_{t-1}` is the productivity bonus from round t-1 (see Productivity Bonus formula)
-- `Department_Revenues_{t-1}` is the sum of all department revenues from round t-1
-- `Treasury_Return_{t-1} = sum(Allocation_{d,t-1} - Consumption_{d,t-1})` is the unspent allocation returned to treasury
+- `Treasury_{t-1}` = treasury at end of previous round
+- `Baseline_Tax = 100` (constant per round)
+- `Sum(Department_Revenues_t)` = total revenue from all departments (same round)
+- `Sum(Allocation_d)` = total budget allocated to all departments
 
-Equivalently, treasury at end of round: `Treasury_{t+1} = Treasury_t - sum(Consumption_d) + Revenue_t`
+### Treasury Flow
+
+```
+Round t starts:
+  Treasury_t available for allocation
+
+Round t allocation:
+  Agents allocate to departments
+
+Round t execution (same round):
+  Each department generates Revenue based on Allocation × Revenue_Factor × Productivity
+
+Round t end:
+  Treasury_{t+1} = Treasury_t - sum(Allocation_d) + sum(Revenue_d) + Baseline_Tax
+```
+
+Key difference from old model: **Revenue applies same round as allocation**, not next round.
 
 ---
 
-## Department Need Calculation
+## Time Mapping
 
-Each department has a fixed baseline consumption plus any event-driven additional cost.
+- **1 round = 3 months (1 quarter)**
+- **50 rounds = 12.5 years** (full episode length)
 
-### Need Formula
+### Display Format
 
-- `Need_d = Baseline_Consumption_d + Event_Impact_d`
-
-Where:
-- `Baseline_Consumption_d`: fixed per department (e.g., Health: 90, Defense: 100)
-- `Event_Impact_d`: additional cost from events affecting this department (hidden from agents)
-- Agents only see severity level and narrative description, not the exact Event_Impact
-
-### Consumption Formula
-
-- `Consumption_d = min(Need_d, Allocation_d)`
-- Cannot exceed allocation (no deficit spending)
-- If `Need > Allocation`: underfunded consumption, department underperforms
-- If `Need <= Allocation`: department functions fully
-
----
-
-## Department Revenue Formula
-
-Each department generates revenue based on its consumption, efficiency, and productivity.
-
-### Department Revenue
-
-- `Department_Revenue_d = Consumption_d * Efficiency_d * Productivity_Multiplier`
+- `Round t` → "Year X, Quarter Y"
 
 Where:
-- `Consumption_d` = the amount actually consumed by department d in the previous round (output-based, not budget-based)
-- `Efficiency_d` = the efficiency rating of department d (see below)
-- `Productivity_Multiplier` = the global productivity multiplier (see below)
-
-Rationale: Revenue comes from actual output (consumption), not budget size. A department that receives a large allocation but under-consumes (because it didn't need it) generates less revenue than one that fully utilizes its allocation.
-
-### Efficiency
-
-- `Efficiency_d = 1.0 - (|Allocation_d - Need_d| / Need_d)`
-
-Where:
-- If `Allocation_d = 0`, then `Efficiency_d = 0.0` (completely ignored)
-- If `Allocation_d = Need_d`, then `Efficiency_d = 1.0` (perfect efficiency)
-- If `Allocation_d > Need_d`, then `Efficiency_d < 1.0` (over-allocated, slight penalty)
-- If `Allocation_d < Need_d`, then `Efficiency_d < 1.0` (underfunded, significant penalty)
-
-Interpretation:
-- Allocation = Need → Efficiency = 1.0 (perfect)
-- Allocation > Need → Efficiency < 1.0 (waste - over-allocation penalized)
-- Allocation < Need → Efficiency < 1.0 (underfunded - under-allocation penalized)
-- Allocation = 0 → Efficiency = 0.0 (completely ignored)
-
-### Global Productivity Multiplier
-
-- `Productivity_Multiplier_t = 1.0 + (Investment_{t-1} / Total_Need_{t-1})`
-
-Where:
-- `Investment_{t-1} = sum(Consumption_{d,t-1})` = total actual spending across all departments (not savings, but consumption)
-- `Total_Need_{t-1} = sum(Need_{d,t-1})` = total need across all departments in round t-1
-
-This multiplier rewards system-wide productivity. Higher collective investment (actual consumption relative to need) increases the multiplier applied to all department revenues.
-
-Rationale: Investment (actual spending on consumption) drives productivity, not savings. Treasury_Return is excluded here to avoid double-counting (Treasury_Return already appears in the treasury formula as a separate term).
-
----
-
-## Productivity Bonus Formula
-
-The productivity bonus rewards departments that consistently generate investment (actual consumption).
-
-### Productivity Bonus (per department)
-
-- `Productivity_Bonus_d = Investment * Efficiency_d * 0.3`
-
-Where:
-- `Investment = sum(Consumption_d)` = total actual spending across all departments (not per-department surplus)
-- `Efficiency_d` = the efficiency rating of department d from round t-1
-- `0.3` = a scaling factor to keep bonuses moderate relative to baseline tax
-
-Note: Productivity bonus is based on total system investment (consumption across all departments), not per-department savings. Treasury_Return is NOT included here to avoid double-counting (Treasury_Return appears separately in the treasury formula).
-
-### Total Productivity Bonus
-
-- `Productivity_Bonus_{total} = Sum(Productivity_Bonus_d for all departments)`
-
----
-
-## Treasury Return Mechanics
-
-Unspent department allocations return to the central treasury at end of each round.
-
-### Treasury Return Calculation
-
-- `Treasury_Return = Sum(Allocation_d - Consumption_d for all departments)`
-
-Where:
-- `Allocation_d` = amount allocated to department d in round t
-- `Consumption_d = min(Need_d, Allocation_d)` = amount actually spent by department d
-- Positive values represent unspent budget returning to treasury
-
-### Key rules:
-- Unspent allocation from each department returns to the central treasury
-- Treasury-level return is NOT distributed back to departments
-- Treasury return is used to calculate the global productivity multiplier
-- Under Model A, over-consumption is impossible (Consumption <= Allocation always)
-
-### Under-Funding Handling
-
-- Under Model A, if `Allocation_d < Need_d`, the department is underfunded
-- `Consumption_d = Allocation_d` (cannot exceed allocation)
-- Underfunding reduces the department's efficiency rating for the next round
-- Underfunding does NOT cause bankruptcy (no deficit spending possible)
-
----
-
-## Bankruptcy Conditions
-
-Bankruptcy triggers immediate episode termination.
-
-### Bankruptcy Triggers
-
-The episode MUST end immediately when ANY of the following conditions are met:
-
-1. **Treasury Bankruptcy**: `Treasury_t <= 0` at any point during round t
-2. **Approval-time Bankruptcy**: `sum(Allocation_d) > Treasury` at proposal time (cannot approve all budgets)
-
-### Model A Note: Consumption-Limited
-
-Under Model A, `Consumption_d = min(Need_d, Allocation_d)`, so over-consumption is impossible by design.
-Bankruptcy can only occur from treasury depletion (Phase 5), not from department-level deficit.
-
-### Bankruptcy Check Timing
-
-- Treasury bankruptcy is checked during Phase 5 (Budget Execution) and Phase 9 (Termination Check)
-- Approval-time check occurs during Phase 4 (Voting) to prevent proposing budgets that can't be paid
-
----
-
-## Population Growth
-
-Population grows each round based on health conditions and crisis impacts.
-
-### Population Formula
-
-- `Population_t = Population_{t-1} * (1 + Growth_Rate_t)`
-
-Where:
-- `Growth_Rate_t = Base_Growth + Health_Bonus_t - Crisis_Penalty_t`
-- `Base_Growth = 0.005` (0.5% per round, baseline demographic growth)
-- `Health_Bonus_t = 0.002` if Health_Efficiency_t > 0.9, else `0` (population benefits from good health services)
-- `Crisis_Penalty_t = 0.01` if a critical (severity 5) event occurred in round t, else `0` (crises cause population decline)
-
-### Initial Population
-
-- `Population_1 = 1000` (initial population at episode start)
-
-### Population and Prosperity
-
-Prosperity is now calculated as GDP per capita:
-
-- `Prosperity_t = (Total_Revenue_t + Treasury_t) / Population_t`
-
-A growing population is healthy but dilutes per-capita prosperity. Crises can cause population decline which increases per-capita prosperity even if total output falls.
-
-### Population Growth Example
-
-- Round 1: Population = 1000
-- Round 2: Base growth only (Health_Efficiency <= 0.9, no crisis): Growth_Rate = 0.005, Population = 1000 * 1.005 = 1005
-- Round 3: Good health (Health_Efficiency > 0.9), no crisis: Growth_Rate = 0.005 + 0.002 = 0.007, Population = 1005 * 1.007 = 1012.0
-- Round 4: Crisis occurred (severity 5 event): Growth_Rate = 0.005 - 0.01 = -0.005, Population = 1012 * 0.995 = 1006.9
-
----
-
-## Shutdown Conditions
-
-Shutdown represents governance collapse where parliament cannot agree on any budget for two consecutive rounds.
-
-### Shutdown Trigger
-
-The episode MUST end immediately with status SHUTDOWN when:
-
-- `sum(Allocation_{d,t}) = 0` AND `sum(Allocation_{d,t-1}) = 0`
-- This means zero total allocation in the current round AND the previous round
-
-### Shutdown vs Bankruptcy
-
-| Aspect | Bankruptcy | Shutdown |
-|--------|-----------|----------|
-| Trigger | Treasury <= 0 or sum(Allocation) > Treasury | Zero allocation for 2 consecutive rounds |
-| Type | Financial failure | Governance collapse |
-| Treasury at trigger | Treasury <= 0 | Treasury may be positive |
-| Penalty | -1000 | 0 (no penalty) |
-
-### Shutdown Does Not Affect Treasury
-
-- Shutdown is a governance failure, not a financial failure
-- Treasury balance is unaffected by the Shutdown condition
-- Shutdown check occurs during Phase 9 (Termination Check)
-
-### Shutdown Check Timing
-
-- Shutdown is checked during Phase 9 (Termination Check)
-- Shutdown is checked BEFORE bankruptcy check
+- `Year = floor((t - 1) / 4) + 1`
+- `Quarter = ((t - 1) % 4) + 1`
+
+### Time Mapping Table
+
+| Round | Year | Quarter |
+|-------|------|---------|
+| 1 | 1 | 1 |
+| 2 | 1 | 2 |
+| 3 | 1 | 3 |
+| 4 | 1 | 4 |
+| 5 | 2 | 1 |
+| ... | ... | ... |
+| 50 | 13 | 2 |
 
 ---
 
 ## Numerical Examples
 
-### Example 1: Normal Operation with Investment-Based Productivity
-
-**Round 1 Setup:**
-- Treasury = 1000 (initial)
-- 6 departments: Social (Baseline=60), Agriculture (Baseline=70), Health (Baseline=90), Education (Baseline=80), Defense (Baseline=100), Commerce (Baseline=75)
-- Population = 1000
-- Allocations: Social=60, Agriculture=70, Health=90, Education=80, Defense=100, Commerce=75 (all match Need exactly)
-- Total allocation = 475 units
-- No events in this round
-
-**Round 1 Execution:**
-- Each department Need = Baseline_Consumption + Event_Impact = Baseline
-- Social: Need=60, Allocation=60, Consumption=min(60,60)=60
-- Agriculture: Need=70, Allocation=70, Consumption=min(70,70)=70
-- Health: Need=90, Allocation=90, Consumption=min(90,90)=90
-- Education: Need=80, Allocation=80, Consumption=min(80,80)=80
-- Defense: Need=100, Allocation=100, Consumption=min(100,100)=100
-- Commerce: Need=75, Allocation=75, Consumption=min(75,75)=75
-
-**Treasury Return:** 0 (perfect allocation, no waste)
-
-**Investment Calculation:**
-- Investment = sum(Consumption) = 60 + 70 + 90 + 80 + 100 + 75 = 475
-- Total Need = 475
-- Productivity_Multiplier = 1.0 + (475/475) = 2.0
-
-**Revenue Calculation (Phase 7):**
-- All departments: Efficiency = 1.0 - (|60-60|/60) = 1.0 (perfect)
-- Department Revenue = Consumption * Efficiency * Productivity_Multiplier
-- Social Revenue = 60 * 1.0 * 2.0 = 120
-- Agriculture Revenue = 70 * 1.0 * 2.0 = 140
-- Health Revenue = 90 * 1.0 * 2.0 = 180
-- Education Revenue = 80 * 1.0 * 2.0 = 160
-- Defense Revenue = 100 * 1.0 * 2.0 = 200
-- Commerce Revenue = 75 * 1.0 * 2.0 = 150
-- Total Department Revenue = 950
-
-**Productivity Bonus:**
-- Productivity_Bonus_d = Investment * Efficiency_d * 0.3 = 475 * 1.0 * 0.3 = 142.5 per efficient department
-- Total Productivity Bonus = 6 * 142.5 = 855
-
-**Round 2 Treasury (at start of round):**
-- Baseline_Tax_2 = 100 + 0.1 * Total_Revenue_1 = 100 + 0.1 * 950 = 195
-- Treasury_2 = Baseline_Tax_2 + Productivity_Bonus_1 + Total_Department_Revenue_1 + Treasury_Return_1
-- Treasury_2 = 195 + 855 + 950 + 0 = 2000
-
-Note: Perfect efficiency generates high revenue and productivity multiplier of 2.0. The system rewards accurate allocation matching need exactly.
-
----
-
-### Example 2: Over-Allocation Penalty
+### Example 1: Normal Operation at Demand
 
 **Round 1 Setup:**
 - Treasury = 1000
-- 4 departments: Health (Baseline=90), Education (Baseline=80), Defense (Baseline=100), Social (Baseline=60)
-- Allocations: Health=200, Education=150, Defense=150, Social=120 (all over-allocated)
-- Total allocation = 620 units
-- No events
+- Population = 1,000,000 (Pop₀)
+- Productivity = 1.0
+- 6 departments with exact demand allocation (no events)
+- Allocations match demand exactly (100% of need)
 
-**Round 1 Consumption:**
-- Health: Need=90, Allocation=200, Consumption=min(90,200)=90, unspent=110
-- Education: Need=80, Allocation=150, Consumption=min(80,150)=80, unspent=70
-- Defense: Need=100, Allocation=150, Consumption=min(100,150)=100, unspent=50
-- Social: Need=60, Allocation=120, Consumption=min(60,120)=60, unspent=60
+**Threshold Calculation:**
+- Demand_d = Baseline_d × (1,000,000 / 1,000,000) × 1.0 = Baseline_d
+- Critical_d = Demand_d × 0.4 = Baseline_d × 0.4
+- Surplus_d = Demand_d × 1.5 = Baseline_d × 1.5
 
-**Treasury Return:** 110 + 70 + 50 + 60 = 290
+**Department Allocations (v1):**
+- Social: 60, Agriculture: 70, Health: 90, Education: 80, Defense: 100, Commerce: 75
+- All at exactly 100% of demand
 
-**Investment Calculation:**
-- Investment = sum(Consumption) = 90 + 80 + 100 + 60 = 330
-- Total Need = 90 + 80 + 100 + 60 = 330
-- Productivity_Multiplier = 1.0 + (330/330) = 2.0
+**Revenue Factor:**
+- Each department at exactly demand: Revenue Factor = 1.0
 
-**Revenue Calculation:**
-- Health Efficiency = 1.0 - (|200-90|/90) = 1.0 - 1.22 = -0.22 (over-allocated!)
-- Education Efficiency = 1.0 - (|150-80|/80) = 1.0 - 0.875 = 0.125
-- Defense Efficiency = 1.0 - (|150-100|/100) = 1.0 - 0.5 = 0.5
-- Social Efficiency = 1.0 - (|120-60|/60) = 1.0 - 1.0 = 0.0
+**Department Revenues:**
+- Social: 60 × 1.0 × 1.0 = 60
+- Agriculture: 70 × 1.0 × 1.0 = 70
+- Health: 90 × 1.0 × 1.0 = 90
+- Education: 80 × 1.0 × 1.0 = 80
+- Defense: 100 × 1.0 × 1.0 = 100
+- Commerce: 75 × 1.0 × 1.0 = 75
+- Total Revenue = 475
 
-Department Revenues:
-- Health Revenue = 90 * (-0.22) * 2.0 = -39.6 (negative revenue!)
-- Education Revenue = 80 * 0.125 * 2.0 = 20
-- Defense Revenue = 100 * 0.5 * 2.0 = 100
-- Social Revenue = 60 * 0.0 * 2.0 = 0
+**Treasury Update:**
+- Treasury_2 = 1000 + 100 + 475 - 475 = 1100
 
-Total Department Revenue = 80.4
-
-**Round 2 Treasury:**
-- Baseline_Tax_2 = 100 + 0.1 * 80.4 = 108
-- Treasury_2 = 108 + 0 + 80.4 + 290 = 478.4
-
-Note: Over-allocation is heavily penalized. Health allocated 200 but only needed 90, resulting in negative efficiency and negative revenue. Social allocated 120 but only needed 60, resulting in zero efficiency and zero revenue.
+**Productivity Update:**
+- Avg Revenue Factor = 1.0
+- ΔProductivity = 0.05 × (1.0 - 1.0) = 0
+- Productivity_2 = 1.0 (unchanged)
 
 ---
 
-### Example 3: Under-Funding During Crisis
+### Example 2: Over-Allocation to Surplus Zone
 
 **Round 1 Setup:**
 - Treasury = 1000
-- 4 departments: Health (Baseline=90), Education (Baseline=80), Defense (Baseline=100), Social (Baseline=60)
-- War event increases Defense Need to 200
-- Allocations: Health=90, Education=80, Defense=150, Social=60 (Defense under-funded)
-- Total allocation = 380 units
+- Population = 1,000,000
+- Productivity = 1.0
+- Allocations at 150% of demand (surplus zone)
 
-**Round 1 Consumption:**
-- Health: Need=90, Allocation=90, Consumption=90
-- Education: Need=80, Allocation=80, Consumption=80
-- Defense: Need=200, Allocation=150, Consumption=150 (under-funded)
-- Social: Need=60, Allocation=60, Consumption=60
+**All Department Allocations:**
+- Social: 90 (150% of 60)
+- Agriculture: 105 (150% of 70)
+- Health: 135 (150% of 90)
+- Education: 120 (150% of 80)
+- Defense: 150 (150% of 100)
+- Commerce: 112.5 (150% of 75)
 
-**Treasury Return:** 0 (all allocations fully consumed)
+**Revenue Factor at Surplus:**
+- Each at 150% of demand: Revenue Factor = 1.8 (peak)
 
-**Investment Calculation:**
-- Investment = 90 + 80 + 150 + 60 = 380
-- Total Need = 90 + 80 + 200 + 60 = 430
-- Productivity_Multiplier = 1.0 + (380/430) = 1.88
+**Department Revenues:**
+- Social: 90 × 1.8 × 1.0 = 162
+- Agriculture: 105 × 1.8 × 1.0 = 189
+- Health: 135 × 1.8 × 1.0 = 243
+- Education: 120 × 1.8 × 1.0 = 216
+- Defense: 150 × 1.8 × 1.0 = 270
+- Commerce: 112.5 × 1.8 × 1.0 = 202.5
+- Total Revenue = 1282.5
 
-**Revenue Calculation:**
-- Health Efficiency = 1.0 - (|90-90|/90) = 1.0
-- Education Efficiency = 1.0 - (|80-80|/80) = 1.0
-- Defense Efficiency = 1.0 - (|150-200|/200) = 1.0 - 0.25 = 0.75 (penalized for under-funding)
-- Social Efficiency = 1.0 - (|60-60|/60) = 1.0
+**Treasury Update:**
+- Treasury_2 = 1000 + 100 + 1282.5 - 712.5 = 1670
 
-Department Revenues:
-- Health Revenue = 90 * 1.0 * 1.88 = 169.2
-- Education Revenue = 80 * 1.0 * 1.88 = 150.4
-- Defense Revenue = 150 * 0.75 * 1.88 = 211.5
-- Social Revenue = 60 * 1.0 * 1.88 = 112.8
+**Productivity Update:**
+- Avg Revenue Factor = 1.8
+- ΔProductivity = 0.05 × (1.8 - 1.0) = 0.04
+- Productivity_2 = 1.04
 
-Total Department Revenue = 643.9
-
-**Round 2 Treasury:**
-- Baseline_Tax_2 = 100 + 0.1 * 643.9 = 164.4
-- Treasury_2 = 164.4 + 0 + 643.9 + 0 = 808.3
-
-Note: Defense was under-funded during crisis (allocated 150, needed 200), resulting in reduced efficiency (0.75). However, the crisis caused high investment relative to need, so productivity multiplier remains high (1.88).
+Note: Over-allocation to surplus zone generates 80% bonus revenue. Productivity increases slightly.
 
 ---
 
-### Example 4: Population Growth and Prosperity
+### Example 3: Critical Failure (Game Over)
 
 **Round 1 Setup:**
 - Treasury = 1000
-- Population = 1000
-- Total Revenue = 500 (hypothetical)
-- Treasury Balance = 800
+- Population = 1,000,000
+- Productivity = 1.0
+- Defense allocation at 30% of demand (below critical)
 
-**Prosperity Calculation:**
-- Prosperity = (Total_Revenue + Treasury) / Population = (500 + 800) / 1000 = 1.3
+**Defense Department:**
+- Baseline = 100
+- Demand = 100 × 1.0 = 100
+- Critical = 100 × 0.4 = 40
+- Allocation = 30 (30% of demand, below critical of 40)
 
-**Round 2 Population:**
-- No crisis, Health_Efficiency <= 0.9
-- Growth_Rate = 0.005 (base only)
-- Population_2 = 1000 * 1.005 = 1005
+**Critical Check:**
+- Allocation (30) < Critical (40)
+- **CRITICAL FAILURE**: Episode terminates immediately
 
-**Round 3 Population (with good health):**
-- Health_Efficiency > 0.9, no crisis
-- Growth_Rate = 0.005 + 0.002 = 0.007
-- Population_3 = 1005 * 1.007 = 1012.0
-
-**Round 4 Population (crisis):**
-- Critical event occurred (severity 5)
-- Growth_Rate = 0.005 - 0.01 = -0.005
-- Population_4 = 1012 * 0.995 = 1006.9
-
-Note: Crisis causes population decline even though base growth is positive. Population growth dilutes per-capita prosperity.
+**Final Prosperity Calculation:**
+- Treasury at termination = 1000 (untouched if failure on allocation)
+- Revenue generated before failure = 0 (no revenue because allocation failed)
+- Final prosperity = (Treasury + Revenue) / Population = 1000 / 1,000,000 = 0.001
 
 ---
 
-### Example 5: Black Swan Event
+### Example 4: Under-Funding But Survivable
+
+**Round 1 Setup:**
+- Treasury = 1000
+- Population = 1,000,000
+- Productivity = 1.0
+- Health allocation at 60% of demand
+
+**Health Department:**
+- Baseline = 90
+- Demand = 90 × 1.0 = 90
+- Critical = 90 × 0.4 = 36
+- Allocation = 54 (60% of demand, above critical of 36)
+
+**Revenue Factor (A→B segment):**
+- Revenue Factor = (54 - 36) / (90 - 36) = 18 / 54 = 0.333
+
+**Revenue:**
+- Health Revenue = 54 × 0.333 × 1.0 = 18
+
+Note: Under-funded departments generate reduced revenue. Below demand but above critical, revenue factor scales linearly from 0 to 1.0.
+
+---
+
+### Example 5: Population Dynamics with Productivity
+
+**Round 1 Setup:**
+- Population = 1,000,000
+- Productivity = 1.0
+- No crisis in Round 1
+
+**Population Update:**
+- Birth Rate = 0.005 × 1.0 = 0.005
+- Death Rate = 0.002 + 0 = 0.002
+- Net Growth = 0.005 - 0.002 = 0.003
+- Population_2 = 1,000,000 × 1.003 = 1,003,000
+
+**Round 2 Setup:**
+- Productivity rises to 1.5 (from sustained profit)
+- Crisis occurs in Round 2
+
+**Population Update Round 2:**
+- Birth Rate = 0.005 × 1.5 = 0.0075
+- Death Rate = 0.002 + 0.01 = 0.012
+- Net Growth = 0.0075 - 0.012 = -0.0045
+- Population_3 = 1,003,000 × 0.9955 = 998,517
+
+Note: Productivity boosts birth rate, but crisis penalty causes population decline even with good productivity.
+
+---
+
+### Example 6: Wastage Zone Penalty
 
 **Round 1 Setup:**
 - Treasury = 2000
-- 6 departments, all efficiently allocated
-- Financial Collapse event (severity 5, Base_Cost=200)
+- Population = 1,000,000
+- Productivity = 1.0
+- Commerce allocation at 300% of demand (beyond wastage)
 
-**Event Impact:**
-- All departments impacted: Event_Impact_d = 200 * 5 * 1.0 = 1000 each
-- Total Need across all departments = baseline + event impact
+**Commerce Department:**
+- Baseline = 75
+- Demand = 75 × 1.0 = 75
+- Surplus = 75 × 1.5 = 112.5
+- Wastage = 75 × 2.5 = 187.5
+- Allocation = 225 (300% of demand)
 
-**Revenue Impact:**
-- High event costs reduce consumption efficiency across the board
-- Productivity multiplier drops due to reduced investment relative to need
+**Revenue Factor (exponential decay):**
+- k = ln(1.8) / (187.5 - 112.5) = 0.5878 / 75 = 0.007837
+- x - surplus = 225 - 112.5 = 112.5
+- Revenue Factor = 1.8 × exp(-0.007837 × 112.5) = 1.8 × 0.413 = 0.743
 
-Note: Black swan events are rare (0.5% chance) but devastating. They impact all departments simultaneously with severity 5.
+**Revenue:**
+- Commerce Revenue = 225 × 0.743 × 1.0 = 167
+
+Note: At 300% of demand (beyond wastage), revenue factor drops to 0.743. Over-allocation past wastage is heavily penalized compared to break-even at exactly 100%.
 
 ---
 
@@ -439,29 +536,47 @@ Note: Black swan events are rare (0.5% chance) but devastating. They impact all 
 
 | Formula | Definition |
 |---------|------------|
-| `Need_d` | `Baseline_Consumption_d + Event_Impact_d` |
-| `Consumption_d` | `min(Need_d, Allocation_d)` |
-| `Investment` | `sum(Consumption_d)` (total actual spending) |
-| `Treasury_t` | `Baseline_Tax_t + Productivity_Bonus_{t-1} + Sum(Department_Revenues_{t-1}) + Treasury_Return_{t-1}` |
-| `Baseline_Tax_t` | `100 + 0.1 * Total_Revenue_{t-1}` |
-| `Department_Revenue_d` | `Consumption_d * Efficiency_d * Productivity_Multiplier` |
-| `Efficiency_d` | `1.0 - (|Allocation_d - Need_d| / Need_d)` |
-| `Productivity_Multiplier_t` | `1.0 + (Investment_{t-1} / Total_Need_{t-1})` |
-| `Productivity_Bonus_d` | `Investment * Efficiency_d * 0.3` |
-| `Treasury_Return` | `Sum(Allocation_d - Consumption_d)` (unspent returned to treasury) |
-| `Population_t` | `Population_{t-1} * (1 + Growth_Rate_t)` |
-| `Growth_Rate_t` | `0.005 + Health_Bonus_t - Crisis_Penalty_t` |
-| `Prosperity_t` | `(Total_Revenue_t + Treasury_t) / Population_t` |
-| `Bankruptcy` | `Treasury_t <= 0 OR sum(Allocation_d) > Treasury` |
+| `Demand_d` | `Baseline_d × (Population_t / Pop₀) × Event_Multiplier` |
+| `Critical_d` | `Demand_d × 0.4` |
+| `Surplus_d` | `Demand_d × 1.5` |
+| `Wastage_d` | `Demand_d × 2.5` |
+| `Revenue_Factor(x)` | Piecewise: None if x<Critical, linear to 1.0 at Demand, linear to 1.8 at Surplus, exponential decay beyond |
+| `Department_Revenue_d` | `Allocation_d × Revenue_Factor_d × Productivity_t` |
+| `Productivity_t` | `clamp(Productivity_{t-1} + 0.05 × (Avg_RF - 1.0), 0.5, 2.0)` |
+| `Birth_Rate` | `0.005 × Productivity_t` |
+| `Death_Rate` | `0.002 + Crisis_Penalty` |
+| `Population_t` | `Population_{t-1} × (1 + Birth_Rate - Death_Rate)` |
+| `Treasury_t` | `Treasury_{t-1} + Baseline_Tax + Sum(Revenues_t) - Sum(Allocations_d)` |
 
 ---
 
 ## Design Rationale
 
-- **Model A (Government Budget Execution)**: Treasury only pays for actual consumption, not full allocations. Unspent allocation returns to treasury automatically.
-- Revenue is calculated AFTER consumption to create a feedback loop: efficient departments generate more revenue next round
-- Efficiency Rating uses consumption efficiency to reward accurate budgeting (allocation close to need)
-- Global Productivity Multiplier incentivizes system-wide efficiency over individual department performance
-- Treasury-level return pooling incentivizes accurate budgeting (departments don't over-request since unspent returns to central treasury)
-- Model A prevents deficit spending: `Consumption = min(Need, Allocation)`, so over-consumption is impossible by design
-- Baseline Tax ensures treasury never fully depletes even if all departments perform poorly
+### Piecewise Revenue Curve
+
+The four-point revenue curve creates distinct economic zones:
+- **Profit zone** (demand to surplus): Rewards moderate over-investment
+- **Loss zone** (critical to demand): Penalizes under-funding
+- **Wastage zone** (beyond surplus): Penalizes excess allocation
+
+This fundamentally differs from the old linear efficiency penalty. The economy now has strategic depth: agents must balance staying above demand (for profit) against avoiding waste (beyond wastage).
+
+### Allocation-Based Revenue
+
+Revenue based on **allocation**, not consumption. This simplifies the model and makes department performance directly tied to budget decisions rather than hidden consumption patterns.
+
+### Persistent Productivity
+
+Productivity persists round-to-round, creating path dependence. A sustained profit zone pushes productivity upward; a sustained loss zone pulls it downward. This rewards consistent good management and punishes sustained poor decisions.
+
+### Same-Round Revenue
+
+Revenue applied in the same round as allocation enables faster feedback loops. Agents see the results of their budget decisions immediately, rather than waiting a round for revenue to materialize.
+
+### Population Scaling
+
+Demand scales with population. As population grows, department needs grow proportionally. This keeps the model grounded: a larger population requires more resources across all sectors.
+
+### Critical Threshold Game-Over
+
+The 40% critical threshold creates a hard floor. Below this, the department (and by extension the nation) fails catastrophically. This forces agents to maintain minimum viable funding across all sectors.
