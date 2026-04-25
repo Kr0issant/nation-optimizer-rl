@@ -10,17 +10,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .config import (
+    BASE_BIRTH_RATE,
+    BASE_DEATH_RATE,
+    CRISIS_DEATH_PENALTY,
+    INITIAL_POPULATION,
+)
+
 
 @dataclass
 class PopulationTracker:
     """Mutable population state."""
 
-    value: int = 1_000_000
-    birth_rate_base: float = 0.005
-    death_rate_base: float = 0.002
-    crisis_death_penalty: float = 0.01
+    value: int = INITIAL_POPULATION
+    birth_rate_base: float = BASE_BIRTH_RATE
+    death_rate_base: float = BASE_DEATH_RATE
+    crisis_death_penalty: float = CRISIS_DEATH_PENALTY
 
-    def update(self, productivity: float, crisis_occurred: bool) -> int:
+    def update(self, productivity: float, crisis_occurred: bool = False) -> int:
         """
         Update population for the current round.
 

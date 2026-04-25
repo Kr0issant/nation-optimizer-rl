@@ -18,8 +18,8 @@ from .events import Event, EventEngine
 from .game import NationGame, StepResult
 from .population import PopulationTracker
 from .productivity import ProductivityTracker
-from .revenue import compute_thresholds, revenue_factor
-from .reward import RewardResult, compute_reward
+from .revenue import calculate_revenue, compute_thresholds, revenue_factor
+from .reward import RewardBreakdown, RewardResult, compute_reward
 from .sector import Sector
 from .treasury import Treasury
 
@@ -35,7 +35,9 @@ __all__ = [
     "ProductivityTracker",
     "PopulationTracker",
     "revenue_factor",
+    "calculate_revenue",
     "compute_thresholds",
     "compute_reward",
+    "RewardBreakdown",
     "RewardResult",
 ]

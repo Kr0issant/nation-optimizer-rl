@@ -16,12 +16,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .config import INITIAL_PRODUCTIVITY
+
 if TYPE_CHECKING:
     from .sector import Sector
 
 
 @dataclass
-class RewardResult:
+class RewardBreakdown:
     """Breakdown of per-step reward components."""
 
     base_reward: float          # prosperity = total_revenue / population
@@ -30,6 +32,16 @@ class RewardResult:
     over_alloc_penalty: float   # -5 × count(sectors in wastage zone)
     under_alloc_penalty: float  # -10 × count(sectors between critical and demand)
     critical_penalty: float     # -1000 if any sector below critical
+
+    @property
+    def over_allocation_penalty(self) -> float:
+        """Descriptive alias for over-allocation penalty."""
+        return self.over_alloc_penalty
+
+    @property
+    def under_allocation_penalty(self) -> float:
+        """Descriptive alias for under-allocation penalty."""
+        return self.under_alloc_penalty
 
     @property
     def total(self) -> float:
@@ -55,19 +67,24 @@ class RewardResult:
 
 
 def compute_reward(
-    sectors: dict[str, "Sector"],
-    total_revenue: float,
-    population: int,
-    productivity: float,
-    round_num: int,
-    critical_failed: bool,
+    sectors: dict[str, "Sector"] | None = None,
+    total_revenue: float | None = None,
+    population: int | None = None,
+    productivity: float = INITIAL_PRODUCTIVITY,
+    round_num: int | None = None,
+    critical_failed: bool | None = None,
     *,
+    prosperity: float | None = None,
+    rounds_survived: int | None = None,
+    over_allocated_count: int | None = None,
+    under_allocated_count: int | None = None,
+    critical_failure_occurred: bool | None = None,
     productivity_bonus_scale: float = 50.0,
     survival_bonus_per_round: float = 10.0,
     over_alloc_penalty_val: float = -5.0,
     under_alloc_penalty_val: float = -10.0,
     critical_penalty_val: float = -1000.0,
-) -> RewardResult:
+) -> RewardBreakdown:
     """
     Compute the per-step reward.
 
@@ -88,34 +105,44 @@ def compute_reward(
 
     Returns
     -------
-    RewardResult
+    RewardBreakdown
         Full reward breakdown.
     """
-    # Base reward = prosperity = revenue per capita
-    base_reward = total_revenue / max(population, 1)
+    if prosperity is None:
+        if total_revenue is None or population is None:
+            raise ValueError("provide prosperity or both total_revenue and population")
+        prosperity = total_revenue / max(population, 1)
+    base_reward = prosperity
 
     # Productivity bonus
     prod_bonus = productivity_bonus_scale * (productivity - 1.0)
 
     # Survival bonus (accumulates over time)
-    survival = survival_bonus_per_round * round_num
+    if rounds_survived is None:
+        rounds_survived = round_num or 0
+    survival = survival_bonus_per_round * rounds_survived
 
     # Zone penalties
-    over_count = 0
-    under_count = 0
-    for s in sectors.values():
-        if s.allocation > s.surplus:
-            over_count += 1
-        elif s.allocation < s.demand and s.allocation >= s.critical:
-            under_count += 1
+    over_count = over_allocated_count or 0
+    under_count = under_allocated_count or 0
+    if sectors is not None and (over_allocated_count is None or under_allocated_count is None):
+        over_count = 0
+        under_count = 0
+        for sector in sectors.values():
+            if sector.allocation > sector.surplus:
+                over_count += 1
+            elif sector.allocation < sector.demand and sector.allocation >= sector.critical:
+                under_count += 1
 
     over_penalty = over_alloc_penalty_val * over_count
     under_penalty = under_alloc_penalty_val * under_count
 
     # Critical penalty
+    if critical_failure_occurred is not None:
+        critical_failed = critical_failure_occurred
     crit_penalty = critical_penalty_val if critical_failed else 0.0
 
-    return RewardResult(
+    return RewardBreakdown(
         base_reward=base_reward,
         productivity_bonus=prod_bonus,
         survival_bonus=survival,
@@ -123,3 +150,6 @@ def compute_reward(
         under_alloc_penalty=under_penalty,
         critical_penalty=crit_penalty,
     )
+
+
+RewardResult = RewardBreakdown
