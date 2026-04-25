@@ -5,6 +5,9 @@ from core.game import NationGame
 from server.models import NationState, NationAction, EventModel
 
 
+TREASURY_ALLOCATION_EPSILON = 1e-6
+
+
 class NationEnvironment(Env):
     """
     OpenEnv wrapper for the Nation Simulator core game engine.
@@ -53,9 +56,8 @@ class NationEnvironment(Env):
         exp_bids = np.exp(raw_bids_stable)
         percentages = exp_bids / np.sum(exp_bids)
 
-        # Retrieve the current treasury from the game's internal state
-        # Subtract a tiny epsilon to ensure floating point math during sum() doesn't exceed the balance
-        treasury = self.game.state["treasury"] - 1e-6
+        # Subtract a tiny epsilon so floating point allocation sums do not exceed the balance.
+        treasury = self.game.state()["treasury"] - TREASURY_ALLOCATION_EPSILON
 
         # Calculate exact dollar allocations, avoiding floating point overflow
         allocations_dict = {}
