@@ -11,7 +11,6 @@ from llm_integration.schemas import (
     LLMDebateAction, 
     LLMProposeBudgetAction, 
     LLMVoteAction, 
-    LLMAbstainAction,
     LLMFinishDebateAction
 )
 
@@ -24,8 +23,6 @@ def _get_schemas_dict(valid_actions: set[str]) -> list[dict[str, Any]]:
         schemas.append(LLMProposeBudgetAction.model_json_schema())
     if "VOTE" in valid_actions:
         schemas.append(LLMVoteAction.model_json_schema())
-    if "ABSTAIN_FROM_PROPOSAL" in valid_actions:
-        schemas.append(LLMAbstainAction.model_json_schema())
     if "FINISH_DEBATE" in valid_actions:
         schemas.append(LLMFinishDebateAction.model_json_schema())
     return schemas
@@ -59,7 +56,7 @@ def render_minister_prompt(
         "\nCURRENT TASK:\n"
         "1. READ the 'DEBATE HISTORY' below very carefully. See what other ministers are proposing.\n"
         "2. RESPOND to your colleagues. If someone suggested something you agree or disagree with, mention it. Do not just repeat yourself.\n"
-        "3. PROPOSE your own departmental needs based on the events in the 'Observation State'. Every event has a 'severity' score (1-5):\n"
+        "3. PROPOSE your own departmental needs based on the events in the 'Observation State'. EVERY department MUST submit a proposal — you are not allowed to abstain. Every event has a 'severity' score (1-5):\n"
         "   - Severity 1-2: Minor; can be managed with standard budget.\n"
         "   - Severity 3-4: Moderate; requires serious reallocation.\n"
         "   - Severity 5: CRITICAL; the nation is failing, emergency response is mandatory.\n"

@@ -14,7 +14,6 @@ from schemas.actions import (
     ProposeBudgetAction,
     VoteAction,
     VoteChoice,
-    AbstainProposalAction,
     FinishDebateAction
 )
 from llm_integration.schemas import LLMAction
@@ -24,7 +23,7 @@ class ActionParseError(ValueError):
 
 _action_adapter = TypeAdapter(LLMAction)
 
-def parse_action_json(payload: str | dict[str, Any]) -> Action:
+def parse_action_json(payload: str | dict[str, Any], target_proposal_id: str | None = None) -> Action:
     """Parses a JSON string or dict into an internal Action object."""
     if isinstance(payload, str):
         payload = payload.strip()
@@ -66,14 +65,16 @@ def parse_action_json(payload: str | dict[str, Any]) -> Action:
         )
 
     elif action_type == "VOTE":
+        final_id = target_proposal_id
+        if not final_id:
+            raise ActionParseError("VOTE action generated but no target_proposal_id was provided by the environment.")
+            
         return VoteAction(
             type=ActionType.VOTE,
-            proposal_id=parsed_llm_action.proposal_id,
+            proposal_id=final_id,
             vote=VoteChoice(parsed_llm_action.vote),
         )
 
-    elif action_type == "ABSTAIN_FROM_PROPOSAL":
-        return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
 
     elif action_type == "FINISH_DEBATE":
         return FinishDebateAction(type=ActionType.FINISH_DEBATE, reason=parsed_llm_action.reason)

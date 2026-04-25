@@ -193,12 +193,9 @@ class NationEnvironment(Environment):
             if p.status == "rejected" or p.status == "rejected_invalid":
                 rejected.append(p.department)
 
-        # Also include departments that abstained or never proposed
+        # Also include departments that never proposed
         for dept in self.departments:
-            if (
-                dept not in proposed_depts
-                and dept not in self.game._abstained_departments
-            ):
+            if dept not in proposed_depts:
                 # Department never proposed — they need a proposal
                 if dept not in rejected:
                     rejected.append(dept)
@@ -225,10 +222,7 @@ class NationEnvironment(Environment):
         if phase == Phase.PROPOSAL:
             # Return first department that hasn't submitted yet
             for dept in self._get_proposal_order():
-                if (
-                    dept not in self.game._submitted_departments
-                    and dept not in self.game._abstained_departments
-                ):
+                if dept not in self.game._submitted_departments:
                     return dept
             return self.departments[0]
 

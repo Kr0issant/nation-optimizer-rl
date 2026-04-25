@@ -68,11 +68,10 @@ class ParliamentaryAction(Action):
       - FINISH_DEBATE:          requires `reason`
       - PROPOSE_BUDGET:         requires `department`, `amount`, `justification`
       - VOTE:                   requires `proposal_id`, `vote`
-      - ABSTAIN_FROM_PROPOSAL:  no extra fields needed
     """
 
     agent_id: str
-    type: str  # DEBATE | FINISH_DEBATE | PROPOSE_BUDGET | VOTE | ABSTAIN_FROM_PROPOSAL
+    type: str  # DEBATE | FINISH_DEBATE | PROPOSE_BUDGET | VOTE
 
     # DEBATE fields
     message: str | None = None
