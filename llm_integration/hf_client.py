@@ -61,38 +61,23 @@ class HuggingFaceTextGenerationClient:
         )
 
     def generate(self, prompt: str) -> TextGenerationResult:
-        response = self._client.text_generation(
-            prompt,
-            max_new_tokens=self.max_new_tokens,
+        messages = [{"role": "user", "content": prompt}]
+        response = self._client.chat_completion(
+            messages=messages,
+            max_tokens=self.max_new_tokens,
             temperature=self.temperature,
-            details=True,
-            return_full_text=False,
         )
-        completion = str(getattr(response, "generated_text", response))
-        details = getattr(response, "details", None)
-        usage = _usage_from_details(details)
-        return TextGenerationResult(completion=completion, **usage)
-
-
-def _usage_from_details(details: Any) -> dict[str, int | None]:
-    if details is None:
-        return {
-            "prompt_tokens": None,
-            "completion_tokens": None,
-            "total_tokens": None,
+        completion = response.choices[0].message.content
+        if completion is None:
+            completion = ""
+        
+        usage_obj = getattr(response, "usage", None)
+        usage = {
+            "prompt_tokens": getattr(usage_obj, "prompt_tokens", None),
+            "completion_tokens": getattr(usage_obj, "completion_tokens", None),
+            "total_tokens": getattr(usage_obj, "total_tokens", None),
         }
-    prompt_tokens = _count_tokens(getattr(details, "prefill", None))
-    completion_tokens = _count_tokens(getattr(details, "tokens", None))
-    total_tokens = (
-        prompt_tokens + completion_tokens
-        if prompt_tokens is not None and completion_tokens is not None
-        else None
-    )
-    return {
-        "prompt_tokens": prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "total_tokens": total_tokens,
-    }
+        return TextGenerationResult(completion=completion, **usage)
 
 
 def _count_tokens(tokens: Any) -> int | None:

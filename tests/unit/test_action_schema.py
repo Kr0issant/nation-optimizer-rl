@@ -1,6 +1,6 @@
 import pytest
 
-from agents.action_parser import ActionParseError, parse_action_json
+from llm_integration.parsers import ActionParseError, parse_action_json
 from schemas.actions import ActionType, ProposeBudgetAction, VoteChoice
 from schemas.phases import Phase, valid_action_types_for_phase
 
