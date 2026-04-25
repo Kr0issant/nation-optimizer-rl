@@ -2013,8 +2013,10 @@ name = "nation-optimizer-rl"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "huggingface-hub" },
     { name = "openenv-core" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
 ]
 
 [package.optional-dependencies]
@@ -2040,10 +2042,12 @@ dev = [
 requires-dist = [
     { name = "accelerate", marker = "extra == 'training'", specifier = ">=0.34" },
     { name = "datasets", marker = "extra == 'training'", specifier = ">=2.20" },
+    { name = "huggingface-hub", specifier = ">=1.12.0" },
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.8" },
     { name = "openenv-core", specifier = ">=0.2.3" },
     { name = "pydantic", specifier = ">=2.13.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "transformers", marker = "extra == 'training'", specifier = ">=4.44" },
     { name = "trl", marker = "extra == 'training'", specifier = ">=0.10" },
 ]

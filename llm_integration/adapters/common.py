@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from agents.action_parser import parse_action_json
+from llm_integration.parsers import parse_action_json
 from schemas.actions import (
     AbstainProposalAction,
     Action,
@@ -82,19 +82,13 @@ def parse_allowed_action(
 
 
 def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> Action:
-    """Return the least invasive valid action for the current phase.
-
-    Preference order follows the action-space guardrails: explicit proposal
-    abstention when it is legal, otherwise a zero request, an abstaining vote,
-    or a no-op public debate message. If no action type is valid, callers should
-    skip policy inference for that phase instead of inventing a side channel.
-    """
+    """Return the least invasive valid action for the current phase."""
     if ActionType.ABSTAIN_FROM_PROPOSAL.value in valid_actions:
         return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
     if ActionType.PROPOSE_BUDGET.value in valid_actions:
         return ProposeBudgetAction(
             type=ActionType.PROPOSE_BUDGET,
-            department=observation.own_department.name,
+            department=observation.own_department.name if observation.own_department else "Unknown",
             amount=0.0,
             justification=SAFE_FALLBACK_JUSTIFICATION,
         )

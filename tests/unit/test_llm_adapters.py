@@ -1,4 +1,6 @@
-from agents.llm import DictatorLLMAdapter, ParliamentaryLLMAdapter, TextGenerationResult
+from llm_integration.adapters.dictator import DictatorLLMAdapter
+from llm_integration.adapters.parliamentary import ParliamentaryLLMAdapter
+from llm_integration.hf_client import TextGenerationResult
 from schemas.actions import ActionType, VoteChoice
 from schemas.observations import (
     Observation,

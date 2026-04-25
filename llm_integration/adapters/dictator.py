@@ -5,14 +5,14 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 
 from agents.base import PolicyAdapter
-from agents.llm.common import (
+from llm_integration.adapters.common import (
     log_llm_call,
     parse_allowed_action,
     parse_generation_result,
     safe_fallback_action,
 )
-from agents.llm.hf_client import TextGenerationClient
-from agents.prompts import render_action_prompt
+from llm_integration.hf_client import TextGenerationClient
+from llm_integration.prompts.dictator import render_dictator_prompt
 from schemas.actions import Action
 from schemas.observations import Observation
 from telemetry import EpisodeLogger
@@ -53,11 +53,10 @@ class DictatorLLMAdapter(PolicyAdapter):
         if not agent_id.strip():
             raise ValueError("agent_id must be non-empty.")
         valid_action_set = set(valid_actions)
-        prompt = render_action_prompt(
+        prompt = render_dictator_prompt(
             observation,
             agent_id,
             valid_action_set,
-            role="central planning dictator",
             oracle=self.oracle,
         )
         generation = parse_generation_result(self.client.generate(prompt))

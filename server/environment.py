@@ -196,8 +196,10 @@ class NationEnvironment(Environment):
         phase = self.game.phase
 
         if phase == Phase.DEBATE:
-            # During debate, any agent can speak; return first department
-            return self.departments[0]
+            # Cycle through all departments during debate
+            n = len(self.departments)
+            next_idx = len(self.game.debate_messages) % n
+            return self.departments[next_idx]
 
         if phase == Phase.PROPOSAL:
             # Return first department that hasn't submitted yet
