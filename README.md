@@ -82,7 +82,7 @@ The complete game design is documented in the [`specification/`](specification/)
 | [`13_RL_ADAPTERS_AND_TRAINING.md`](specification/13_RL_ADAPTERS_AND_TRAINING.md) | Adapters, telemetry, evaluation, TRL/Unsloth pipeline |
 | [`APPENDIX_A_EXAMPLES.md`](specification/APPENDIX_A_EXAMPLES.md) | Concrete numerical examples |
 
-**Hackathon themes and judging (external minimum bar):** [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) — OpenEnv Apr ’26 themes, TRL/Unsloth requirement, Space, plots, and README expectations.
+**Hackathon themes and judging (external minimum bar):** OpenEnv Apr ’26 themes, TRL/Unsloth requirement, Space, plots, and README expectations.
 
 **Sprint plan (reconciled with the spec):** [`ImplemenationPlanRLIncluded.md`](ImplemenationPlanRLIncluded.md).
 
@@ -153,7 +153,7 @@ Tests and CI should use mock `TextGenerationClient` implementations, so no netwo
 
 ## Hackathon Context
 
-This project targets the **OpenEnv Hackathon** (India 2026) expectations described in [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) (themes, judging weights, and **minimum submission** requirements). In short:
+This project targets the **OpenEnv Hackathon** (India 2026) expectations (themes, judging weights, and **minimum submission** requirements). In short:
 
 - **OpenEnv (latest):** build on the framework; use `Environment` / `MCPEnvironment`, Gym-style `reset` / `step` / `state`, client–server boundaries, and a valid **`openenv.yaml`** when the server is published.
 - **Training:** a **working script** using **Hugging Face TRL** or **Unsloth** (ideally Colab-runnable) that trains **against the environment**, not only a static dataset, with **evidence** (loss and reward or clear before/after behavior, plots committed as e.g. PNG in-repo).
