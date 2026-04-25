@@ -352,6 +352,10 @@ class NationGame:
         agent_id = str(action.get("agent_id") or action.get("agent") or department)
         amount = action.get("amount")
 
+        if department in self._submitted_departments:
+            info["ignored_actions"].append({"action": dict(action), "reason": "duplicate_proposal"})
+            return
+
         rejection_reason = self._proposal_rejection_reason(agent_id, department, amount)
         if rejection_reason is not None:
             proposal = self._new_proposal(
@@ -481,7 +485,16 @@ class NationGame:
                     self.sectors[proposal.department].allocation + proposal.amount
                 )
 
-        critical_failed = any(sector.is_critical_failure(self.population.value) for sector in self.sectors.values())
+        approved_departments = {
+            proposal.department
+            for proposal in self.proposals
+            if proposal.status == PROPOSAL_STATUS_APPROVED
+        }
+        critical_failed = any(
+            sector.is_critical_failure(self.population.value)
+            for sector in self.sectors.values()
+            if sector.name in approved_departments
+        )
         if critical_failed:
             self.last_total_allocation = sum(sector.allocation for sector in self.sectors.values())
             return True
@@ -489,7 +502,7 @@ class NationGame:
         self.last_total_allocation = 0.0
         for sector in self.sectors.values():
             self.last_total_allocation += sector.allocation
-            self.treasury.balance -= sector.allocation
+            self.treasury.debit(sector.allocation)
         return False
 
     def _tally_votes(self) -> None:
@@ -529,6 +542,8 @@ class NationGame:
     ) -> None:
         completed_round = completed_round or self.round
         if critical_failed:
+            self.last_total_revenue = 0.0
+            self.last_total_surplus = 0.0
             self.done = True
             self.termination_reason = TERMINATION_CRITICAL_FAILURE
         else:
@@ -622,8 +637,6 @@ class NationGame:
             return "unknown_department"
         if agent_id != department:
             return "wrong_department"
-        if department in self._submitted_departments:
-            return "duplicate_proposal"
         if amount_value < 0 or math.isnan(amount_value) or math.isinf(amount_value):
             return "invalid_amount"
         if amount_value > self.treasury.balance:
