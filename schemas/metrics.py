@@ -12,3 +12,8 @@ class EpisodeMetrics:
     final_treasury: float | None = None
     final_productivity: float | None = None
     termination_reason: str | None = None
+    invalid_action_count: int = 0
+    parse_error_count: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
