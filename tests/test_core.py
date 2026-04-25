@@ -143,8 +143,13 @@ def test_treasury():
     t.apply_baseline_tax()
     assert t.balance == 900
 
-    t.debit(1000)
-    assert t.is_bankrupt()
+    try:
+        t.debit(1000)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("overdraft debit should be rejected")
+    assert not t.is_bankrupt()
     print("  ✓ Treasury operations correct")
 
 
