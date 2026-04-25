@@ -138,6 +138,7 @@ class ParliamentaryObservation(Observation):
 
     # Phase-gated action mask
     valid_actions: list[str] = Field(default_factory=list)
+    target_proposal_id: str | None = None
 
     # Termination info
     termination: dict[str, Any] = Field(default_factory=dict)

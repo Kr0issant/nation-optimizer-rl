@@ -37,6 +37,7 @@ def render_minister_prompt(
 ) -> str:
     """Render a strict JSON prompt for a parliamentary minister."""
     obs_dict = build_public_observation(observation)
+    
     action_names = sorted(valid_actions)
     action_schemas = _get_schemas_dict(valid_actions)
     
@@ -66,6 +67,8 @@ def render_minister_prompt(
         "   - Use 'DEBATE' to talk to your colleagues.\n"
         "   - Use 'FINISH_DEBATE' ONLY when you believe a consensus has been reached or there is nothing left to discuss. This moves the parliament to the proposal phase immediately.\n"
         "   - NOTE: The parliament has a hard limit of 18 messages per round. After 18 messages, the debate will be terminated automatically.\n"
+        "5. VOTING (If applicable):\n"
+        "   - If 'target_proposal_id' is provided in the Observation State, you MUST focus your vote on that specific proposal.\n"
         "\nSTRICT CONSTRAINTS:\n"
         "- Return ONLY a JSON object. No prose outside the JSON.\n"
         f"- Valid action types: {json.dumps(action_names)}.\n"

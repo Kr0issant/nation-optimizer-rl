@@ -33,6 +33,7 @@ def build_public_observation(observation: Any) -> dict[str, Any]:
         "votes": [vote.model_dump() for vote in observation.votes],
         "debate_messages": list(observation.debate_messages),
         "own_department": observation.own_department.model_dump() if observation.own_department else None,
+        "target_proposal_id": getattr(observation, "target_proposal_id", None),
         "termination": dict(observation.termination) if observation.termination else {},
     }
 
