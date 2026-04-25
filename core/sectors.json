@@ -1,0 +1,49 @@
+{
+  "initial_population": 1000000,
+  "initial_treasury": 1000,
+  "baseline_tax": 100,
+  "initial_productivity": 1.0,
+  "productivity_bounds": [0.5, 2.0],
+  "productivity_step": 0.05,
+  "max_rounds": 50,
+  "critical_ratio": 0.4,
+  "surplus_ratio": 1.5,
+  "wastage_ratio": 2.5,
+  "rf_max": 1.8,
+  "birth_rate_base": 0.005,
+  "death_rate_base": 0.002,
+  "crisis_death_penalty": 0.01,
+
+  "sectors": {
+    "Social": {
+      "baseline": 60,
+      "full_name": "Social/Municipal",
+      "description": "Public services, infrastructure maintenance, welfare programs, and municipal operations"
+    },
+    "Agriculture": {
+      "baseline": 70,
+      "full_name": "Agriculture",
+      "description": "Farming, food production, irrigation, and agricultural exports"
+    },
+    "Health": {
+      "baseline": 90,
+      "full_name": "Health",
+      "description": "Healthcare services, hospitals, disease prevention, and public health campaigns"
+    },
+    "Education": {
+      "baseline": 80,
+      "full_name": "Education/R&D",
+      "description": "Schools, universities, research programs, and technological development"
+    },
+    "Defense": {
+      "baseline": 100,
+      "full_name": "Defense",
+      "description": "Military operations, border security, defense equipment, and national security"
+    },
+    "Commerce": {
+      "baseline": 75,
+      "full_name": "Commerce",
+      "description": "Trade infrastructure, market regulation, exports, and economic development"
+    }
+  }
+}

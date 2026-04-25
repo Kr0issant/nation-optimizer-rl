@@ -1,0 +1,320 @@
+{
+  "event_distribution": {
+    "no_event": 0.40,
+    "minor": 0.35,
+    "moderate": 0.20,
+    "critical": 0.04,
+    "compound": 0.01
+  },
+
+  "negative_events": [
+    {
+      "id": "war",
+      "name": "War",
+      "severity_range": [3, 5],
+      "affected_sectors": {
+        "Defense": 2.5,
+        "Agriculture": 1.3,
+        "Commerce": 1.2
+      },
+      "category": "moderate",
+      "description": "Armed conflict depletes resources, diverts budget, and disrupts supply chains",
+      "narratives": [
+        "Enemy forces have crossed the border. Defense requests emergency funding for military operations. Agricultural and commerce sectors report supply chain disruptions.",
+        "A border conflict has escalated into open warfare. Military operations require immediate funding. Trade routes disrupted, agricultural exports halted.",
+        "Armed insurgents have seized territory along the eastern border. Defense ministry mobilizing reserves. Economic activity disrupted in border regions."
+      ]
+    },
+    {
+      "id": "famine",
+      "name": "Famine",
+      "severity_range": [2, 4],
+      "affected_sectors": {
+        "Agriculture": 2.0,
+        "Health": 1.5,
+        "Commerce": 1.3
+      },
+      "category": "moderate",
+      "description": "Crop failure and food shortage strain health services and reduce workforce productivity",
+      "narratives": [
+        "Harvest projections indicate a 40% shortfall. Agricultural imports required. Health services report increased malnutrition cases. Workforce productivity declining.",
+        "Severe drought has devastated crop yields across multiple provinces. Food prices soaring. Health ministry reports rising malnutrition among vulnerable populations.",
+        "Unseasonable frost has destroyed winter crops. Grain reserves at critical levels. Emergency food distribution programs needed. Commerce sector reports supply shortages."
+      ]
+    },
+    {
+      "id": "virus_outbreak",
+      "name": "Virus Outbreak",
+      "severity_range": [2, 5],
+      "affected_sectors": {
+        "Health": 2.5,
+        "Commerce": 1.4,
+        "Agriculture": 1.3
+      },
+      "category": "moderate",
+      "description": "Epidemic demands emergency health spending and reduces labor availability",
+      "narratives": [
+        "A viral outbreak has spread across multiple provinces. Health ministry requests emergency medical supplies. Economic output declining as workforce falls ill. Food distribution affected.",
+        "New infectious disease detected in three major cities. Hospitals overwhelmed. Commerce activity slowing as workers quarantine. Agricultural labor shortages reported.",
+        "Pandemic conditions declared. Health infrastructure strained beyond capacity. International trade restricted. Agricultural harvesting crews depleted by illness."
+      ]
+    },
+    {
+      "id": "unemployment",
+      "name": "Unemployment Crisis",
+      "severity_range": [2, 4],
+      "affected_sectors": {
+        "Social": 2.0,
+        "Commerce": 1.5,
+        "Education": 1.2
+      },
+      "category": "moderate",
+      "description": "Rising unemployment strains social services, reduces commerce tax revenue, and pressures education funding",
+      "narratives": [
+        "Unemployment rates have spiked. Social services report increased benefit claims. Commerce ministry reports declining tax revenue. Education budgets under pressure as workforce development programs expand.",
+        "Mass layoffs across manufacturing sector. Social welfare programs overwhelmed with applications. Consumer spending declining sharply. Vocational retraining programs urgently needed.",
+        "Unemployment reaches decade-high levels. Homelessness increasing in urban areas. Small businesses closing at alarming rate. Education ministry proposes emergency skills programs."
+      ]
+    },
+    {
+      "id": "teacher_shortage",
+      "name": "Teacher Shortage",
+      "severity_range": [2, 4],
+      "affected_sectors": {
+        "Education": 2.0,
+        "Social": 1.3
+      },
+      "category": "minor",
+      "description": "Critical shortage of qualified teachers disrupts education delivery and strains social services",
+      "narratives": [
+        "Schools report acute teacher shortages. Education ministry requests emergency hiring budget. Social services note increased youth counseling demand. Teacher training programs need investment.",
+        "Nationwide teacher exodus as salaries fail to keep pace with inflation. Rural schools hardest hit. Youth delinquency rising in underserved areas.",
+        "University education departments report declining enrollment. Teaching profession losing talent to private sector. Emergency staffing measures required across all grade levels."
+      ]
+    },
+    {
+      "id": "market_crash",
+      "name": "Market Crash",
+      "severity_range": [3, 5],
+      "affected_sectors": {
+        "Commerce": 2.5,
+        "Social": 1.2,
+        "Agriculture": 1.2,
+        "Health": 1.2,
+        "Education": 1.2,
+        "Defense": 1.2
+      },
+      "category": "critical",
+      "description": "Financial markets collapse, reducing commerce revenue and straining all government functions",
+      "narratives": [
+        "Stock markets have crashed. Commerce ministry reports severe revenue shortfall. All departments report reduced tax collections. Emergency measures required to maintain basic services.",
+        "Financial sector in freefall. Banking system under severe stress. Government revenue projections slashed across all departments. Austerity measures being considered.",
+        "Currency crisis deepening. International investors fleeing. Import costs skyrocketing across all sectors. Emergency fiscal stabilization required."
+      ]
+    },
+    {
+      "id": "contamination",
+      "name": "Contamination",
+      "severity_range": [2, 4],
+      "affected_sectors": {
+        "Agriculture": 2.0,
+        "Health": 1.8,
+        "Social": 1.3
+      },
+      "category": "moderate",
+      "description": "Environmental contamination affects food supply and public health",
+      "narratives": [
+        "Water supply contamination detected. Agricultural land affected. Health services report increased illness cases. Social services preparing for community relocation if spread continues.",
+        "Industrial chemical spill has contaminated major river system. Farmland downstream rendered unusable. Emergency medical screening underway. Affected communities need relocation assistance.",
+        "Heavy metal contamination found in soil across farming district. Crops recalled from markets. Hospital admissions rising with poisoning symptoms. Municipal water treatment facilities overwhelmed."
+      ]
+    },
+    {
+      "id": "infrastructure_collapse",
+      "name": "Infrastructure Collapse",
+      "severity_range": [3, 4],
+      "affected_sectors": {
+        "Social": 2.5,
+        "Commerce": 1.4,
+        "Defense": 1.2
+      },
+      "category": "moderate",
+      "description": "Critical infrastructure failure disrupts transport, communication, and economic activity",
+      "narratives": [
+        "A critical bridge has collapsed. Social services report transport disruptions. Commerce activity slowed. Defense logistics affected as supply routes are compromised.",
+        "Power grid failure across northern provinces. Municipal services crippled. Businesses unable to operate. Military communications infrastructure damaged.",
+        "Major highway network deteriorated beyond safe use. Emergency repairs required on hundreds of bridges and roads. Supply chains disrupted nationwide. Defense mobility compromised."
+      ]
+    },
+    {
+      "id": "public_distrust",
+      "name": "Public Distrust",
+      "severity_range": [2, 4],
+      "affected_sectors": {
+        "Social": 2.0,
+        "Agriculture": 1.1,
+        "Health": 1.1,
+        "Education": 1.1,
+        "Defense": 1.1,
+        "Commerce": 1.1
+      },
+      "category": "minor",
+      "description": "Erosion of public confidence in government strains social cohesion and reduces compliance",
+      "narratives": [
+        "Public trust in government institutions has declined significantly. Social services report increased resistance to public programs. All departments note reduced voluntary compliance. Recovery requires sustained transparency.",
+        "Corruption scandal has eroded public confidence. Citizens protesting government spending. Tax compliance dropping. Social unrest in major cities.",
+        "Media exposé reveals government inefficiency. Public approval ratings at historic low. Civic participation declining. All ministries facing increased scrutiny and reduced cooperation."
+      ]
+    }
+  ],
+
+  "positive_events": [
+    {
+      "id": "trade_agreement",
+      "name": "Trade Agreement",
+      "severity_range": [1, 2],
+      "affected_sectors": {
+        "Commerce": 0.9
+      },
+      "treasury_injection": 200,
+      "category": "minor",
+      "description": "Favorable trade terms increase commerce revenue and economic activity",
+      "narratives": [
+        "New trade agreement signed. Export revenues projected to increase. Commerce ministry reports favorable terms. Treasury expected to receive tariff payments.",
+        "Bilateral trade deal ratified. Import tariffs reduced on key goods. Export market access expanded. Treasury to benefit from increased trade volume.",
+        "Regional free trade zone established. Commerce sector projects significant growth. Foreign direct investment increasing. Customs revenue rising."
+      ]
+    },
+    {
+      "id": "tech_innovation",
+      "name": "Technological Innovation",
+      "severity_range": [1, 2],
+      "affected_sectors": {
+        "Education": 0.8
+      },
+      "treasury_injection": 150,
+      "category": "minor",
+      "description": "R&D breakthrough improves productivity across sectors",
+      "narratives": [
+        "Researchers have developed new efficiency technology. Education sector reports productivity gains. Long-term economic benefits projected. Patents and licensing expected to generate treasury revenue.",
+        "Major scientific breakthrough at national research institute. Technology licensing deals being negotiated. Education costs reduced through digital innovation.",
+        "Domestically developed technology gaining international attention. Licensing revenue flowing in. Education sector efficiency improved through new learning platforms."
+      ]
+    },
+    {
+      "id": "agricultural_bounty",
+      "name": "Agricultural Bounty",
+      "severity_range": [1, 2],
+      "affected_sectors": {
+        "Agriculture": 0.7
+      },
+      "treasury_injection": 180,
+      "category": "minor",
+      "description": "Favorable weather and yields increase agricultural output and exports",
+      "narratives": [
+        "Harvest projections exceed expectations. Agricultural sector reports record yields. Food exports projected to increase. Treasury to receive export tariffs.",
+        "Perfect growing season produces bumper crop. Grain reserves overflowing. Export opportunities emerging in international markets. Farm income at all-time high.",
+        "New crop varieties delivering exceptional yields. Agricultural surplus enables food exports for first time. Rural economy thriving."
+      ]
+    },
+    {
+      "id": "health_campaign",
+      "name": "Public Health Campaign",
+      "severity_range": [1, 2],
+      "affected_sectors": {
+        "Health": 0.8
+      },
+      "treasury_injection": 120,
+      "category": "minor",
+      "description": "Successful health initiatives reduce disease burden and future costs",
+      "narratives": [
+        "Public health campaign shows remarkable results. Disease incidence declining. Healthcare costs projected to decrease. Treasury saves on future health emergency response.",
+        "Vaccination program reaches record coverage. Hospital admissions dropping. Preventive care reducing long-term healthcare burden. Health ministry operating more efficiently.",
+        "National fitness initiative improving population health outcomes. Chronic disease rates falling. Workplace productivity increasing as sick days decline."
+      ]
+    },
+    {
+      "id": "infrastructure_upgrade",
+      "name": "Infrastructure Upgrade",
+      "severity_range": [1, 2],
+      "affected_sectors": {
+        "Social": 0.9
+      },
+      "treasury_injection": 100,
+      "category": "minor",
+      "description": "New infrastructure reduces maintenance costs and improves services",
+      "narratives": [
+        "New infrastructure project completed ahead of schedule. Social services report improved efficiency. Maintenance costs declining. Treasury to receive infrastructure service fees.",
+        "Smart city initiative delivering results. Municipal services automated and more efficient. Energy costs reduced. Public satisfaction with services increasing.",
+        "Transport network modernization complete. Commute times reduced. Economic productivity boosted by improved connectivity. Operating costs significantly lower."
+      ]
+    },
+    {
+      "id": "diplomatic_victory",
+      "name": "Diplomatic Victory",
+      "severity_range": [1, 2],
+      "affected_sectors": {
+        "Defense": 0.8
+      },
+      "treasury_injection": 250,
+      "category": "minor",
+      "description": "Successful diplomacy reduces defense spending requirements and may bring foreign aid",
+      "narratives": [
+        "Diplomatic negotiations successful. Regional tensions declining. Defense spending requirements reduced. Allied nations providing economic assistance. Treasury to receive foreign aid payments.",
+        "Peace accord signed with neighboring state. Military demobilization underway. Defense budget requirements reduced. International community pledging reconstruction aid.",
+        "Successful mediation prevents armed conflict. Defense readiness can be reduced. Foreign governments offering trade concessions and financial support."
+      ]
+    },
+    {
+      "id": "public_enthusiasm",
+      "name": "High Public Enthusiasm",
+      "severity_range": [1, 2],
+      "affected_sectors": {
+        "Social": 0.9,
+        "Agriculture": 0.9,
+        "Health": 0.9,
+        "Education": 0.9,
+        "Defense": 0.9,
+        "Commerce": 0.9
+      },
+      "treasury_injection": 100,
+      "category": "minor",
+      "description": "Nationwide optimism boosts productivity and tax compliance",
+      "narratives": [
+        "Citizen morale is at a record high. All sectors report improved productivity. Tax compliance increasing across all departments. Treasury expects higher than projected revenue.",
+        "National celebration following major achievement has galvanized public spirit. Volunteerism surging. Economic activity increasing. Government approval at all-time high.",
+        "Wave of optimism sweeps the nation. Consumer confidence soaring. Civic engagement at record levels. All departments benefit from improved public cooperation."
+      ]
+    }
+  ],
+
+  "black_swan_events": [
+    {
+      "id": "natural_disaster",
+      "name": "Natural Disaster",
+      "severity": 5,
+      "primary_multiplier": 4.0,
+      "secondary_multiplier": 1.5,
+      "category": "critical",
+      "description": "Major natural catastrophe disrupts normal government operations across all sectors",
+      "narratives": [
+        "A major earthquake has struck. One sector crippled with severe damage. Emergency response required across all departments. Recovery will require significant resource reallocation.",
+        "Category 5 hurricane has devastated coastal regions. Infrastructure destroyed. Mass evacuation underway. All government resources being redirected to disaster response.",
+        "Unprecedented flooding has submerged major population centers. Rescue operations ongoing. Agricultural lands destroyed. Economic activity at standstill."
+      ]
+    },
+    {
+      "id": "compound_crisis",
+      "name": "Compound Crisis",
+      "severity": 5,
+      "affected_sectors_multiplier_range": [3.0, 4.0],
+      "category": "critical",
+      "description": "Multiple crises strike simultaneously, overwhelming government capacity across all sectors",
+      "narratives": [
+        "Multiple crises have struck at once. All departments report critical demands. Government capacity severely strained. Emergency measures across all sectors required to prevent collapse.",
+        "Simultaneous economic collapse and natural disaster. All sectors overwhelmed. Emergency reserves depleted. International aid being requested.",
+        "Cascading failures across financial, health, and infrastructure systems. Every ministry reports crisis-level demands. National emergency declared."
+      ]
+    }
+  ]
+}

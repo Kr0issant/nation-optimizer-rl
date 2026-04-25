@@ -38,7 +38,7 @@
 
 - **Investment**: Total actual spending across all sectors. `Investment = sum(Consumption_d)`. Drives national productivity. Differs from Treasury_Return (savings). Defined in `04_ECONOMY_MODEL.md`.
 
-- **Need**: The total resource requirement for a Department in a round. `Need_d = Baseline_Consumption_d + Event_Impact_d`. The exact Need value is hidden from agents (they only see severity + narrative). Defined in `04_ECONOMY_MODEL.md`.
+- **Need / Demand**: The total resource requirement for a Department in a round. `Demand_d = Baseline_d × (Population_t / Pop₀) × Event_Multiplier`. Scales with population growth and event severity. The exact Demand value is hidden from agents (they only see severity + narrative). The terms "Need" and "Demand" are used interchangeably. Defined in `04_ECONOMY_MODEL.md`.
 
 - **Per-Capita Income**: The prosperity metric. `Prosperity = Total_Revenue / Population`. Higher is better. Defined in `04_ECONOMY_MODEL.md` and `09_REWARD_MODEL.md`.
 
@@ -70,7 +70,7 @@
 
 - **Treasury Injection**: A direct cash addition to the treasury from positive events (e.g., Trade Agreement +200). Distinct from revenue which is generated through economic activity. Defined in `06_EVENT_SYSTEM.md`.
 
-- **Treasury_Return**: The unspent allocation returned to the central treasury at end of round. `Treasury_Return = sum(Allocation_d - Consumption_d)`. Used in productivity multiplier calculation. Defined in `04_ECONOMY_MODEL.md`.
+- **Treasury_Return**: The unspent allocation returned to the central treasury at end of round. `Treasury_Return = sum(Allocation_d - Consumption_d)` where `Consumption_d = min(Demand_d, Allocation_d)`. Over-allocated departments consume only up to Demand; the excess returns to treasury. Defined in `04_ECONOMY_MODEL.md`.
 
 - **Wastage**: The allocation point where revenue factor returns to 1.0. `Wastage = Demand × 2.5`. Beyond this threshold, revenue factor decays below 1.0, penalizing over-allocation. Defined in `04_ECONOMY_MODEL.md`.
 

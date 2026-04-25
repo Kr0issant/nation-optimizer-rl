@@ -146,7 +146,7 @@ v1 Departments: Social/Municipal, Agriculture, Health, Education/R&D, Defense, C
 - **Affected departments**: Social (primary), Commerce, Education
 - **Multiplier**: Social ×2.0, Commerce ×1.5, Education ×1.2
 - **Severity range**: 2–4
-- **Description**: Rising unemployment strains social services, reduces commerce tax revenue, and的压力 pressures education funding
+- **Description**: Rising unemployment strains social services, reduces commerce tax revenue, and pressures education funding
 - **Narrative example**: "Unemployment rates have spiked. Social services report increased benefit claims. Commerce ministry reports declining tax revenue. Education budgets under pressure as workforce development programs expand."
 
 ---
