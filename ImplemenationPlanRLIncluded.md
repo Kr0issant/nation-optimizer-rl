@@ -1,108 +1,75 @@
-# 30-Hour Implementation Plan: MARL Nation Simulator
+# Implementation plan (reconciled with the specification)
 
-**Constraint:** 3 People, 30 Hours.  
-**Core Architecture:** Pure deterministic Python core, wrapped in OpenEnv, driven by a two-phase LLM orchestrator (Debate -> Vote) trained via HuggingFace `trl` (PPO).
+**Purpose:** This file is a **sprint-style team plan** (originally a 30-hour, three-person split). It is **reconciled** with the authoritative game design in [`specification/`](specification/) and the current engine in [`core/game.py`](core/game.py). If anything here disagrees with `specification/` or `core/`, **those win**.
 
----
-
-## Phase 1: The Core Engine (Hours 0-10)
-**Owner:** Person 1 (The Math/Physics Engineer)  
-**Goal:** Build the `core/` directory. It must run offline with standard Python dictionaries. No LLMs, no OpenEnv yet.
-
-### 1. Data Structures (`core/sectors.json`, `core/events.json`)
-* **`sectors.json`:** Define the 6 sectors.
-  ```json
-  {"Military": {"base_dc": 10, "base_d": 30, "base_ds": 60}}
-  ```
-* **`events.json`:** Define the modifiers.
-  ```json
-  {"Pandemic": {"target": "Healthcare", "dc_mult": 2.5, "severity": 4}}
-  ```
-
-### 2. Math Modules (`core/revenue.py`, `core/treasury.py`)
-* **`revenue.py`:** Write `revenue_factor(alloc, dc, d, ds)`.
-  * **Logic:** If `alloc < dc`: return `None` (Fatal). If `alloc < d`: scale 0.5 to 1.0. If `alloc <= ds`: scale 1.0 to 1.8. If `alloc > ds`: `1.8 * exp(-k(alloc - ds))`.
-* **`treasury.py`:** Write the `Treasury` class. Track total pool. Add `debit()` and `credit()`.
-
-### 3. Dynamics Modules (`core/productivity.py`, `core/population.py`)
-* **`productivity.py`:** Write `update(sector_multipliers)`. 
-  * **Formula:** `clip(mean(multipliers) * previous_prod, 0.1, 2.0)`.
-* **`population.py`:** Write `update(productivity)`. 
-  * **Formula:** `pop += pop * (base_birth_rate * productivity)`. Keep `base_birth_rate` very small (e.g., 0.01).
-
-### 4. The Orchestrator (`core/game.py`)
-* Write the `NationGame` class.
-* **`step(allocations: dict)`:** The master loop.
-  1. Process allocations -> get revenue multipliers.
-  2. If any multiplier is `None` (Critical Failure): Trigger curriculum bailout or game over.
-  3. Calculate revenues, update Treasury.
-  4. Update Productivity and Population.
-  5. Calculate step Reward = $\Delta$ GDP Per Capita.
-  6. Return `{"treasury": x, "reward": y, "done": z, "info": {...}}`
+**Hackathon bar:** OpenEnv submission, TRL *or* Unsloth training script, plots, Space, and README materials are defined in [`specification/PROBLEM_STATEMENT/`](specification/PROBLEM_STATEMENT/) (see the Apr ’26 OpenEnv themes and judging criteria document). This plan aligns with that deliverables list.
 
 ---
 
-## Phase 2: OpenEnv & Baselines (Hours 5-15)
-**Owner:** Person 2 (The Systems Integrator)  
-**Goal:** Wrap the core in the OpenEnv API and build dummy agents to prove the math doesn't explode.
+## How this differs from the first draft of this file
 
-### 1. Pydantic Models (`server/models.py`)
-* Define `NationState` (Treasury, Pop, Prod, Event List).
-* Define `NationAction` (List of 6 floats).
-
-### 2. The OpenEnv Wrapper (`server/environment.py`)
-* Write `NationEnvironment(MCPEnvironment)`.
-* **CRITICAL - The Softmax Boundary:** Inside `step()`, before calling `game.step()`, catch the LLM's raw output array and normalize it to the treasury:
-  ```python
-  # Softmax allocation
-  exp_a = np.exp(raw_action)
-  percentages = exp_a / np.sum(exp_a)
-  allocations_dict = {sector: percentages[i] * state.treasury for i, sector in enumerate(sectors)}
-  
-  # Call the game engine
-  self.game.step(allocations_dict)
-  ```
-
-### 3. Baseline Agents (`agents/random_agent.py`, `agents/conservative_agent.py`)
-* Build a `RandomAgent` that spits out 6 random floats.
-* Run `scripts/benchmark_baselines.py`. Let it run for 1000 steps.
-* **Validation Check:** Does the Treasury go to infinity? Does float overflow occur? If yes, tell Person 1 to lower the 1.8x max multiplier or the population scalar.
+| Earlier draft (superseded) | Current design |
+|----------------------------|----------------|
+| `NationGame.step(allocations: dict)` as the main API | Phased `NationGame` with **9 phases per round**; ministers emit **structured actions** (debate, propose budget, vote, abstain) per [`07_AGENT_ACTION_SPACE.md`](specification/07_AGENT_ACTION_SPACE.md). |
+| Softmax over six raw floats, then `game.step(allocation_dict)` | Budget execution and revenue follow **proposals, voting, and** [`04_ECONOMY_MODEL.md`](specification/04_ECONOMY_MODEL.md). There is **no** softmax “bid vector → allocation” in the core loop. |
+| Two-phase “debate then vote” as the only turn shape | **Public debate + proposals + voting** are embedded in the 9-phase turn; see [`03_TURN_STRUCTURE.md`](specification/03_TURN_STRUCTURE.md). |
+| “Curriculum bailout” to ignore critical failure and inject cash | **Not** in the v1 spec: critical failure and bankruptcy are hard stops per [`10_SUCCESS_CRITERIA.md`](specification/10_SUCCESS_CRITERIA.md). Do not add bailouts in `server/` without a spec change. |
+| Example sector names (e.g. “Military”, “Healthcare”) in snippets | v1 departments are fixed in the spec and data (e.g. Social, Agriculture, Health, Education, Defense, Commerce). |
+| PPO as the named training path | **TRL or Unsloth** is the hackathon **minimum**; PPO (or other algorithms) is an **optional** training choice, implemented in `training/`, not in `core/`. |
 
 ---
 
-## Phase 3: The LLM-MARL Pipeline (Hours 5-20)
-**Owner:** Person 3 (The Machine Learning Engineer)  
-**Goal:** Build the two-phase LLM system and write the PPO training loop.
+## Constraint and architecture (unchanged in spirit)
 
-### 1. The Orchestrator (`agents/orchestrator.py`)
-* Write the function `run_two_phase_turn(state)`.
-  * **Phase 1 (Debate):** Loop through the 6 sector prompts. Use `model.generate()` (fast, no gradients). Concatenate outputs into `transcript_string`.
-  * **Phase 2 (Vote):** Prompt the 6 models again, appending `transcript_string`. Force them to output JSON: `{"bid": 5.2}`. (These bids are the raw numbers that will hit the Softmax in the env).
-
-### 2. The Training Loop (`scripts/train_ppo.py`)
-* Initialize `AutoModelForCausalLMWithValueHead` (Llama-3-8B) and a LoRA config (rank 16).
-* Initialize `trl.PPOTrainer`.
-* Write the epoch loop:
-  1. Call `run_two_phase_turn()` to get the 6 JSON output tensors.
-  2. Pass the parsed values to `env.step()`.
-  3. Get the scalar reward (GDP change).
-  4. Create `reward_tensors = [torch.tensor(reward)] * 6`.
-  5. Call `ppo_trainer.step(query_tensors, response_tensors, reward_tensors)`.
-  6. Log loss.
+- **Constraint:** Small team, short clock.
+- **Architecture:** Deterministic **Python core** (`core/`, no OpenEnv/LLM imports), **schemas** for actions/observations/rewards, **adapters** in `agents/`, **OpenEnv**-compatible **server** layer when wired, **TRL/Unsloth** for demonstrable training per problem statement.
+- **Collective reward** and **no individual rewards** are unchanged; see [`11_GUARDRAILS.md`](specification/11_GUARDRAILS.md).
 
 ---
 
-## Phase 4: Integration, Tuning & Rescue (Hours 20-30)
-**Owner:** All Hands  
-**Goal:** Wire it all together and train.
+## Phase 1 — Core engine (the math and rules)
 
-### 1. System Merge (Hour 20)
-* Connect `train_ppo.py` to `server/environment.py`. Run a 1-epoch test to ensure tensors flow cleanly from the LLM, through the Softmax, into the Game Engine, and back as gradients.
+**Goal:** The engine runs **offline** with the phased loop, treasury, revenue, events, and termination.
 
-### 2. The Curriculum Bailout (Hours 21-23)
-* If the LLM randomly starves a sector on Step 1, the reward will be `-1000` and `done=True`.
-* Implement the bailout: For the first 50 epochs, if `alloc < dc`, intercept the `done=True` in `server/environment.py`. Return a penalty of `-100`, but inject emergency cash and let the episode continue.
+- **Data:** [`core/sectors.json`](core/sectors.json), [`core/events.json`](core/events.json) — follow the spec’s event and sector semantics, not ad-hoc JSON shapes from old examples.
+- **Math:** [`core/revenue.py`](core/revenue.py), [`core/treasury.py`](core/treasury.py), productivity, population — match [`04_ECONOMY_MODEL.md`](specification/04_ECONOMY_MODEL.md) and related docs.
+- **Orchestrator:** [`core/game.py`](core/game.py) `NationGame` — phases, proposals, voting resolution, then execution and reward.
 
-### 3. Let it Train (Hours 23-30)
-* Run `python scripts/train_ppo.py`.
-* Monitor the loss. You are looking for the global reward (GDP Per Capita) to slowly trend upward, meaning the 6 personas learned to balance their Softmax bids to stay in the 1.0x - 1.8x profit zones without bankrupting each other.
+**Validation:** Unit tests and integration tests under `tests/`; no LLM or OpenEnv required.
+
+---
+
+## Phase 2 — OpenEnv, server, and baselines
+
+**Goal:** Expose the core through a **thin** `server/` wrapper (Gym-style / OpenEnv contract), **Pydantic** (or shared schema) I/O, and **rule-based** baselines per [`13_RL_ADAPTERS_AND_TRAINING.md`](specification/13_RL_ADAPTERS_AND_TRAINING.md).
+
+- **Not in scope here:** Converting free-form model outputs into a softmax over departments. Adapters must output **valid structured actions**; the **environment** validates and advances phases.
+- **Baselines:** greedy, equal-split, conservative, optimal-zone, random (as listed in `13`); use these to check stability and metrics before LLM training.
+
+**Validation:** Smoke episodes, seeded benchmarks, treasury and metrics in range.
+
+---
+
+## Phase 3 — LLM adapters and training script
+
+**Goal:** **Parliamentary** and optional **dictator** LLM flows that call a text client, parse JSON into the action schema, and log telemetry; a **TRL or Unsloth** training entrypoint that trains against **rollouts from the real environment** (not a static dataset as the only story).
+
+- **Debate and voting:** Map to the existing phases; reuse [`agents/prompts.py`](agents/prompts.py) and strict parsing in [`agents/action_parser.py`](agents/action_parser.py).
+- **Training:** Align with the hackathon doc: show **loss and reward (or policy improvement) evidence**, baselines vs trained, plots under `assets/results/` and links in the README. Algorithm choice (e.g. PPO vs supervised LoRA) stays in **implementation**, but TRL/Unsloth must be satisfied for submission.
+
+**Validation:** Parse failure rates down; one real run committed as evidence for judges.
+
+---
+
+## Phase 4 — Integration, HF Space, and story
+
+**Goal:** `openenv.yaml`, hosted Space, README links (blog/short video per criteria), and a clear “before/after” or baseline comparison.
+
+- **Client/server separation:** Clients do not import server internals; follow OpenEnv expectations from the problem statement.
+- **No** reward-hacking shortcuts that contradict [`11_GUARDRAILS.md`](specification/11_GUARDRAILS.md).
+
+---
+
+## File name
+
+The filename `ImplemenationPlanRLIncluded.md` is kept to avoid breaking existing links; fix the typo if you rename it repo-wide.

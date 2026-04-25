@@ -215,3 +215,4 @@ The RL layer is successful when it can show:
 - Do not allow private side-channel communication between agents.
 - Do not move game-rule validation into adapters.
 - Do not treat prompt text as an environment action unless it parses into the structured action schema.
+- For **OpenEnv Hackathon** submissions, also satisfy the **minimum deliverables** in `specification/PROBLEM_STATEMENT/` (e.g. latest OpenEnv, TRL *or* Unsloth training script, training evidence, Space, README links). `11_GUARDRAILS.md` explains how that relates to documents `01`–`12`.
