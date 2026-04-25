@@ -748,4 +748,169 @@
   padding: 48px;
   color: var(--text-dim);
   font-size: 13px;
+  text-align: center;
+}
+
+/* ── Live-run controls ────────────────────────────────────────────────── */
+.run-controls h3 .meta code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--bg-3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.run-controls__toggle {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.run-controls__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.run-controls__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex: 1;
+  min-width: 0;
+}
+
+.run-controls__field input,
+.run-controls__field select {
+  background: var(--bg-3);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.run-controls__field input:disabled,
+.run-controls__field select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.run-controls__hint {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.run-controls__row {
+  display: flex;
+  gap: 8px;
+}
+
+.run-controls__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.run-controls__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+.run-controls__status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-mute);
+}
+
+.run-controls__status.is-connecting .dot {
+  background: var(--accent-warn);
+  box-shadow: 0 0 6px var(--accent-warn);
+}
+
+.run-controls__status.is-running .dot {
+  background: var(--accent-good);
+  box-shadow: 0 0 6px var(--accent-good);
+  animation: liveBlink 1.4s ease-in-out infinite;
+}
+
+.run-controls__status.is-done .dot {
+  background: var(--accent-2);
+}
+
+.run-controls__status.is-error .dot {
+  background: var(--accent-bad);
+}
+
+@keyframes liveBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.run-controls__error {
+  color: var(--accent-bad);
+  font-style: normal;
+  margin-left: 4px;
+}
+
+.run-controls__warn {
+  font-size: 11px;
+  color: var(--accent-warn);
+  background: rgba(246, 193, 119, 0.08);
+  border: 1px solid rgba(246, 193, 119, 0.3);
+  padding: 6px 8px;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.run-controls__warn code {
+  font-family: var(--mono);
+}
+
+.live-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--accent-bad);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  animation: liveBlink 1.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+.follow-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.follow-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
 }

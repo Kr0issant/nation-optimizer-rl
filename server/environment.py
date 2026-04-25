@@ -231,7 +231,6 @@ class NationEnvironment(Environment):
                         if dept == proposer:
                             continue
                         if dept not in target.votes:
-                            print(f"[DEBUG] Voting on {target.proposal_id}: Proposer={proposer}, NextVoter={dept}")
                             return dept
             
             # If we reach here, either no proposals are pending or all are fully voted

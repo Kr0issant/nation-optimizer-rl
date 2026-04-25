@@ -87,15 +87,15 @@ function findFailingSectors(allocations, thresholds, sectorNames) {
 }
 
 export function normalizeEpisode(raw) {
-  if (!raw || !Array.isArray(raw.rounds)) return raw;
-
-  const sectors = raw.config?.sectors || [];
+  const safe = raw || {};
+  const rawRounds = Array.isArray(safe.rounds) ? safe.rounds : [];
+  const sectors = safe.config?.sectors || [];
   const sectorNames = sectors.map(s => s.name);
 
   let cum = 0;
-  let prevTreasuryAfter = raw.config?.initial_treasury ?? 1000;
+  let prevTreasuryAfter = safe.config?.initial_treasury ?? 1000;
 
-  const rounds = raw.rounds.map((r, i) => {
+  const rounds = rawRounds.map((r, i) => {
     const events = (r.events || []).map(ev => ({
       ...ev,
       affected_sectors: ev.affected_sectors || {},
@@ -210,23 +210,27 @@ export function normalizeEpisode(raw) {
     };
   });
 
-  const last = rounds[rounds.length - 1];
-  const finalProsperity =
-    (last.treasury_after + last.total_revenue) / Math.max(last.population, 1);
-  const summary = raw.summary || {
-    rounds_survived: last.round_num,
-    total_reward: cum,
-    final_treasury: last.treasury_after,
-    final_prosperity: finalProsperity,
-    final_productivity: last.productivity,
-    final_population: last.population,
-    termination_reason: last.termination_reason,
-  };
+  const last = rounds.length > 0 ? rounds[rounds.length - 1] : null;
+  let summary = safe.summary || null;
+  if (!summary && last) {
+    const finalProsperity =
+      (last.treasury_after + last.total_revenue) /
+      Math.max(last.population, 1);
+    summary = {
+      rounds_survived: last.round_num,
+      total_reward: cum,
+      final_treasury: last.treasury_after,
+      final_prosperity: finalProsperity,
+      final_productivity: last.productivity,
+      final_population: last.population,
+      termination_reason: last.termination_reason,
+    };
+  }
 
   return {
-    ...raw,
+    ...safe,
     config: {
-      ...raw.config,
+      ...(safe.config || {}),
       sectors,
     },
     rounds,

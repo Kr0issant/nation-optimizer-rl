@@ -1,20 +1,22 @@
 # Visualizer ↔ Game-engine contract
 
 This document describes what the React visualizer in `visualizer/` expects from
-the rest of the project, and lists the **backend pieces that still need to be
-built** so the viewer can load *real* training rollouts instead of the
-synthetic episode in `src/sampleRun.js`.
+the rest of the project. The viewer can render episodes from two sources:
 
-The synthetic sample is intentionally shaped 1:1 like the eventual exporter
-output, so once the pieces below are in place the visualizer needs **zero
-changes** — drag-and-drop a `.json` file (or click "Load episode JSON") and the
-dashboard will render it.
+1. **Live streaming** (default): the FastAPI server in
+   `server/visualizer_server.py` runs LLM- or rule-based agents through the
+   parliamentary loop and streams per-round records over Server-Sent Events.
+2. **Static JSON files**: drag-and-drop a `.json` file (or click
+   "Load episode JSON") with the shape described below.
+
+The two paths share the same per-round schema, so anything the live runner
+produces can be dropped onto disk and replayed later.
 
 ---
 
 ## 1. The episode JSON contract
 
-The visualizer reads a single JSON object per episode. Top-level shape:
+Top-level shape:
 
 ```jsonc
 {
@@ -47,7 +49,7 @@ The visualizer reads a single JSON object per episode. Top-level shape:
 
 ### 1.1 Per-round shape
 
-Each entry in `rounds[]` is one full step (Phases 1–6 of the spec):
+Each entry in `rounds[]` is one full step (Phases 1–9 of the spec):
 
 ```jsonc
 {
@@ -63,18 +65,18 @@ Each entry in `rounds[]` is one full step (Phases 1–6 of the spec):
       "name": "War",
       "severity": 4,
       "affected_sectors": { "Defense": 2.5, "Agriculture": 1.3 },
-      "category": "moderate",     // minor | moderate | critical | compound
+      "category": "moderate",
       "narrative": "Enemy forces…",
-      "treasury_injection": 0,    // > 0 only for positive events
+      "treasury_injection": 0,
       "is_positive": false
     }
   ],
   "crisis_occurred": false,
-  "treasury_injection": 0,        // sum of positive-event injections
+  "treasury_injection": 0,
 
   // Phase 2 — debate
   "debate": [
-    { "agent_id": "minister_health", "department": "Health", "message": "…" }
+    { "agent_id": "Health", "department": "Health", "message": "…" }
   ],
 
   // Phases 3–4 — proposals + voting
@@ -82,19 +84,21 @@ Each entry in `rounds[]` is one full step (Phases 1–6 of the spec):
   "proposals": [
     {
       "proposal_id": "r1_Defense",
-      "agent_id": "minister_defense",
+      "agent_id": "Defense",
       "department": "Defense",
       "amount": 320,
       "justification": "…",
-      "timestamp_phase": 3
+      "status": "approved",
+      "rejection_reason": null,
+      "votes": { "Health": "YES", "Defense": "ABSTAIN", ... }
     }
   ],
   "votes": [
     {
       "proposal_id": "r1_Defense",
-      "agent_id": "minister_health",
+      "agent_id": "Health",
       "department": "Health",
-      "vote": "YES"               // YES | NO | ABSTAIN
+      "vote": "YES"
     }
   ],
   "vote_results": [
@@ -103,11 +107,11 @@ Each entry in `rounds[]` is one full step (Phases 1–6 of the spec):
       "department": "Defense",
       "amount": 320,
       "yes": 4, "no": 1, "abstain": 1,
-      "status": "APPROVED"        // APPROVED | REJECTED | AUTO_REJECTED_INSUFFICIENT_TREASURY
+      "status": "APPROVED"
     }
   ],
 
-  // Phase 5 — execution
+  // Phases 5–8 — execution + revenue + surplus
   "allocations":       { "Defense": 320, "Health": 95, ... },
   "consumptions":      { "Defense": 250, "Health": 90, ... },
   "revenues":          { "Defense": 480, "Health": 130, ... },
@@ -128,7 +132,7 @@ Each entry in `rounds[]` is one full step (Phases 1–6 of the spec):
   "avg_revenue_factor":1.21,
   "prosperity":        0.00102,
 
-  // Phase 6 — reward
+  // Phase 9 — reward + termination
   "reward": {
     "base_reward":         0.00102,
     "productivity_bonus":  2.0,
@@ -141,7 +145,8 @@ Each entry in `rounds[]` is one full step (Phases 1–6 of the spec):
   "cumulative_reward": 2.001,
 
   "done": false,
-  "termination_reason": null    // string when done=true, e.g. "BANKRUPTCY"
+  "termination_reason": null,
+  "critical_failure_in_budget": false
 }
 ```
 
@@ -149,12 +154,12 @@ Each entry in `rounds[]` is one full step (Phases 1–6 of the spec):
 
 `App.jsx::onLoadFile` requires:
 
-- `parsed.rounds` is a non-empty array.
+- `parsed.rounds` is an array (may be empty for a freshly-started live run).
 - `parsed.config.sectors` exists.
 
 Everything else is run through `src/utils/normalizeEpisode.js`, which derives
 the optional fields below from the spec formulas in
-`specification/04_ECONOMY_MODEL.md`. So the **engine's lean output** is enough.
+`specification/04_ECONOMY_MODEL.md`. The engine's lean output is enough.
 
 ### 1.3 Required vs derived fields (per round)
 
@@ -185,179 +190,78 @@ the rest, and labels the treasury cell as "frozen — failure before debit".
 
 ---
 
-## 2. Game-engine pieces still missing
+## 2. Live streaming
 
-The current backend only has `core/__init__.py`, `core/game.py`, and the two
-JSON catalogs. To produce the JSON above we still need the following modules.
-Suggested layout (mirrors `FILE_STRUCTURE.md`):
+The visualizer talks to `server/visualizer_server.py` over a tiny REST + SSE
+surface. The Vite dev server already proxies `/api/*` to
+`http://127.0.0.1:8001` (override with `VIZ_BACKEND_URL`).
 
-### 2.1 `core/` — game internals
+### 2.1 Endpoints
 
-| File | Purpose | Status |
+| Method | Path | Purpose |
 |---|---|---|
-| `core/game.py` | `NationGame` + `StepResult` (treasury, allocations, revenues, …) | **exists** |
-| `core/config.py` | `GameConfig` (constants, ratios, JSON loader) | **exists** |
-| `core/sectors.json` / `core/events.json` | Catalog data | **exists** |
-| `core/sector.py` | `Sector` dataclass + threshold accessors + `compute_revenue` | **exists** |
-| `core/treasury.py` | Treasury debit/credit ledger | **exists** |
-| `core/events.py` | Event roller (weighted tiers, severity sampling, treasury injection, demand multipliers) | **exists** |
-| `core/reward.py` | Per-step reward decomposition with the keys §1.1 expects (`base_reward`, `productivity_bonus`, `survival_bonus`, `over_alloc_penalty`, `under_alloc_penalty`, `critical_penalty`, `total`) | **exists** |
-| `core/population.py` | Productivity update, birth/death model | **exists** (referenced in `game.py`) |
-| `core/revenue.py` | `revenue_factor()` and `compute_thresholds()` helpers | **exists** (imported by `sector.py`) |
-| `core/voting.py` | Plurality with abstentions, self-abstention rule, `AUTO_REJECTED_INSUFFICIENT_TREASURY` | **missing** — orchestrator-level; not used by `game.py` yet |
+| `GET` | `/api/health` | Liveness check. |
+| `GET` | `/api/config` | Visualizer-shaped `config` block (sectors, baselines, …). |
+| `GET` | `/api/modes` | Available inference modes (`llm` + rule-based baselines). |
+| `GET` | `/api/runs` | List recent runs. |
+| `POST` | `/api/runs` | Start a new run. Body: `{mode, model_id?, seed, max_rounds, temperature}`. Returns `{run_id, ...}`. |
+| `GET` | `/api/runs/{id}/snapshot` | Full episode-so-far in the §1 shape. |
+| `GET` | `/api/runs/{id}/stream` | SSE stream — see §2.2. |
 
-The engine's `StepResult.to_dict()` already emits the right reward shape. What
-it does **not** emit (and what the visualizer derives or tolerates as missing):
+### 2.2 SSE event types
 
-- `treasury_before` (single `treasury` is given — the post-state)
-- `thresholds[s]` (`demands[s]` only — the rest are derived from spec 04 ratios)
-- `event_multipliers[s]` (aggregated from `events[].affected_sectors`)
-- `prosperity`, `avg_revenue_factor`, `cumulative_reward` (derived)
-- `events[].is_positive` and `events[].treasury_injection` (the engine's
-  `_treasury_injection` field is private — `Event.to_dict()` should expose it
-  publicly when the recorder is built, otherwise the visualizer falls back to
-  category/multiplier heuristics)
-- The orchestrator-level fields (`debate`, `proposals`, `votes`,
-  `vote_results`, `proposal_order`) — the engine doesn't run a parliament,
-  the orchestrator will.
+Each event arrives as `event: <type>\ndata: <json>\n\n`. The browser client in
+`src/utils/api.js` dispatches them into typed callbacks.
 
-### 2.2 `schemas/` — wire formats
+| `event` | Payload | Notes |
+|---|---|---|
+| `start` | `{run_id, policy, mode, seed, config, max_rounds}` | Sent once on connection. |
+| `round` | A single per-round record (§1.1). | One per completed round. |
+| `summary` | The §1 `summary` block. | Sent once when the episode finishes. |
+| `error` | `{message: string}` | Adapter or engine failure. |
+| `done`  | `{reason: "complete" \| "error" \| "already_closed"}` | Always the last event. |
 
-These dataclasses define what the orchestrator records each round:
+Late subscribers receive the full event history first (so refreshing the page
+mid-run replays from the beginning), then live updates.
 
-- `schemas/action.py` — `ProposalAction { department, amount, justification }`,
-  `VoteAction { proposal_id, vote, reasoning? }`, `DebateMessage { department, message }`.
-- `schemas/observation.py` — what each agent sees in Phase 0
-  (treasury, sector states, last round summary, recent events).
-- `schemas/reward.py` — the `RewardBreakdown` shape above.
-- `schemas/episode.py` — Pydantic / dataclass mirror of §1.1, used as the
-  serialisation target for `evaluation/export_episode.py`.
+### 2.3 Inference modes
 
-### 2.3 `agents/` — decision-makers
+Modes returned from `/api/modes`:
 
-Each minister needs an interface the orchestrator can call:
+- `llm` — drives every minister with a Hugging Face Inference API model.
+  Requires `HF_TOKEN` in the server `.env`; reads `HF_MODEL_ID` as the default
+  model id (the form lets you override it per-run).
+- `equal_split`, `optimal_zone`, `conservative`, `greedy` — rule-based
+  baselines from `agents/rule_based/`. Useful for offline demos.
 
-```python
-class MinisterAgent:
-    department: str
-    def speak(self, obs) -> Optional[DebateMessage]: ...
-    def propose(self, obs) -> ProposalAction: ...
-    def vote(self, obs, proposal) -> VoteAction: ...
-```
+### 2.4 Running locally
 
-Concrete implementations:
-- `agents/llm_agent.py` (LLM-backed, used during data collection / play)
-- `agents/scripted_agent.py` (heuristic baseline — useful for visualizer demos)
-- `agents/policy_agent.py` (loads a trained RL policy)
-
-### 2.4 `core/orchestrator.py` — runs an episode
-
-This is the single biggest missing piece. It owns the per-round loop:
-
-```python
-def run_episode(game, agents, *, recorder) -> EpisodeRecord:
-    while not game.done:
-        events = game.roll_events()
-        recorder.events(events)
-
-        for a in agents.shuffled():
-            msg = a.speak(game.observation_for(a))
-            if msg: recorder.debate(msg)
-
-        order = game.proposal_order()
-        proposals = [agents[d].propose(game.observation_for(agents[d])) for d in order]
-        recorder.proposals(proposals)
-
-        votes, results = game.run_voting(proposals, agents)
-        recorder.votes(votes, results)
-
-        step = game.execute(results)            # returns StepResult
-        recorder.step(step)                      # treasury, revenues, reward, …
-    return recorder.finalize()
-```
-
-The orchestrator is also the natural home for the rotating proposal order,
-sequential treasury depletion checks, and `AUTO_REJECTED_INSUFFICIENT_TREASURY`
-bookkeeping — all of which the visualizer expects to see in `vote_results[]`.
-
-### 2.5 `telemetry/recorder.py` — capture buffer
-
-A small in-memory buffer that the orchestrator writes to during a run and that
-serialises out at the end. Two outputs:
-
-1. `telemetry/runs/<run_id>/episode_<n>.json` — the visualizer-ready file.
-2. `telemetry/runs/<run_id>/trajectory_<n>.jsonl` — one line per agent
-   action/observation/reward, used by RL training.
-
-The episode JSON is just `EpisodeRecord.model_dump_json(indent=2)`.
-
-### 2.6 `evaluation/export_episode.py` — CLI exporter
-
-A thin entry point so users can produce a viewer-ready file from any episode:
+Two terminals:
 
 ```bash
-python -m evaluation.export_episode \
-    --policy gpt-4o-mini \
-    --seed 42 \
-    --max-rounds 50 \
-    --out telemetry/runs/demo/episode_001.json
-```
+# Terminal 1 — backend (FastAPI + SSE on :8001)
+python -m scripts.run_visualizer_server
 
-It should:
-
-1. Build a `NationGame` from `core/sectors.json` + `core/events.json`.
-2. Instantiate the chosen agents.
-3. Call `run_episode(...)` with a fresh `Recorder`.
-4. Write the JSON to `--out`.
-
-That file can then be dragged into the visualizer.
-
-### 2.7 (Optional) `server/replay_server.py` — live streaming
-
-If we want to watch training rollouts live (rather than after the fact), a
-tiny FastAPI/uvicorn server that exposes:
-
-- `GET /episodes` → list of available `episode_*.json`
-- `GET /episodes/{id}` → the full JSON
-- `GET /stream/{run_id}` → SSE/WebSocket pushing newly recorded rounds
-
-The viewer would only need a "Connect to live run" button; the rest of the UI
-stays identical because the per-round shape is unchanged.
-
----
-
-## 3. End-to-end checklist
-
-To get from "today" to "visualizer shows real episodes":
-
-1. Extract `Sector`, `revenue_factor`, and reward math out of `core/game.py`
-   into `core/sector.py` and `core/reward.py` (so the reward keys in §1.1 are
-   guaranteed to exist).
-2. Add `core/events.py`, `core/voting.py`, `core/population.py`.
-3. Define `schemas/{action,observation,reward,episode}.py`.
-4. Implement `agents/scripted_agent.py` for the first end-to-end smoke test.
-5. Implement `core/orchestrator.py` + `telemetry/recorder.py`.
-6. Wire `evaluation/export_episode.py` and run it once with the scripted
-   agent.
-7. Drag the resulting `episode_001.json` into the visualizer — the existing
-   sample data falls away and the dashboard renders the real run.
-
-Until step 7 is reachable, the viewer keeps using `src/sampleRun.js` as a
-realistic stand-in. That sample file is the canonical reference for the
-expected shape — when in doubt, match what it produces.
-
----
-
-## 4. Running the visualizer
-
-```bash
+# Terminal 2 — frontend (Vite dev server on :5173)
 cd visualizer
-npm install              # one time
-npm run dev              # → http://localhost:5173
-npm run build            # static bundle in dist/
+npm install     # one time
+npm run dev
 ```
 
-Notes:
+Open <http://localhost:5173>, pick a policy in the **Live inference** card, and
+press **Start run**. Rounds will stream into the dashboard as they're produced.
+
+---
+
+## 3. Static JSON files
+
+The static loader is unchanged. To export a recorded run, hit
+`GET /api/runs/{id}/snapshot` and save the response — the file matches the
+shape in §1 and can be dragged back into the visualizer at any time.
+
+---
+
+## 4. Development notes
 
 - `vite.config.js` has `server.watch.usePolling: true` because the project
   lives on a WSL-mounted Windows drive where `fs.watch()` throws `EISDIR`.
@@ -365,3 +269,6 @@ Notes:
 - For the very first run on Windows + WSL, install dependencies *inside* WSL
   (`wsl npm install`) to avoid `EPERM`/`EISDIR` cleanup errors, then run the
   build/dev server from either side.
+- The proxy block in `vite.config.js` strips response buffering for the
+  `/stream` endpoint so SSE chunks arrive immediately even through the dev
+  proxy.

@@ -2,9 +2,18 @@
 Logic to convert the raw NationEnvironment observation into a clean LLM context dictionary.
 """
 
-from dataclasses import asdict
+from dataclasses import asdict, fields, is_dataclass
 from typing import Any, Mapping
 from schemas.observations import Observation
+
+
+def _to_dict(obj: Any) -> Any:
+    """Serialize a Pydantic model or a frozen dataclass to a plain dict."""
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return asdict(obj)
+    return obj
 
 HIDDEN_EVENT_FIELDS = frozenset(
     {
@@ -29,10 +38,10 @@ def build_public_observation(observation: Any) -> dict[str, Any]:
         "phase": phase_str,
         "treasury": observation.treasury,
         "event_ledger": [_sanitize_event(event) for event in observation.event_ledger],
-        "proposals": [proposal.model_dump() for proposal in observation.proposals],
-        "votes": [vote.model_dump() for vote in observation.votes],
+        "proposals": [_to_dict(proposal) for proposal in observation.proposals],
+        "votes": [_to_dict(vote) for vote in observation.votes],
         "debate_messages": list(observation.debate_messages),
-        "own_department": observation.own_department.model_dump() if observation.own_department else None,
+        "own_department": _to_dict(observation.own_department) if observation.own_department else None,
         "termination": dict(observation.termination) if observation.termination else {},
     }
 
@@ -40,7 +49,7 @@ def build_oracle_observation(observation: Observation) -> dict[str, Any]:
     """Builds an oracle observation for the dictator (sees private metrics and event costs)."""
     return {
         **build_public_observation(observation),
-        "oracle_own_department": asdict(observation.own_department) if observation.own_department else None,
+        "oracle_own_department": _to_dict(observation.own_department) if observation.own_department else None,
         "event_ledger": [dict(event) for event in observation.event_ledger],
     }
 

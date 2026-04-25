@@ -11,6 +11,7 @@ from schemas.actions import (
     Action,
     ActionType,
     DebateAction,
+    FinishDebateAction,
     ProposeBudgetAction,
     VoteAction,
     VoteChoice,
@@ -88,33 +89,62 @@ def parse_allowed_action(
 
 
 def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> Action:
-    """Return the least invasive valid action for the current phase."""
-    if ActionType.ABSTAIN_FROM_PROPOSAL.value in valid_actions:
-        return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
-        
+    """Return the least harmful valid action for the current phase.
+
+    Priority: propose a budget (keeps the game alive) > vote YES on pending
+    proposals > debate > abstain > finish debate.  Abstaining during the
+    proposal phase starves every sector and triggers critical failure, so
+    ``PROPOSE_BUDGET`` must come first.
+    """
     if ActionType.PROPOSE_BUDGET.value in valid_actions:
+        dept_name = (
+            observation.own_department.name
+            if observation.own_department
+            else "Unknown"
+        )
+        n_depts = max(len(observation.proposals), 6)
+        share = max(observation.treasury / n_depts, 1.0)
         return ProposeBudgetAction(
             type=ActionType.PROPOSE_BUDGET,
-            department=observation.own_department.name if observation.own_department else "Unknown",
-            amount=0.0,
+            department=dept_name,
+            amount=share,
             justification=SAFE_FALLBACK_JUSTIFICATION,
         )
-        
+
     if ActionType.VOTE.value in valid_actions:
-        # Find the first pending proposal to vote on
-        pending_ids = [p.proposal_id for p in observation.proposals if p.status == "pending"]
-        target_id = pending_ids[0] if pending_ids else (observation.proposals[0].proposal_id if observation.proposals else "unknown_id")
+        dept = (
+            observation.own_department.name
+            if observation.own_department
+            else ""
+        )
+        target = None
+        for p in observation.proposals:
+            owner = getattr(p, "agent_id", None) or p.department
+            if (
+                p.status == "pending"
+                and p.department != dept
+                and owner != dept
+                and dept not in (p.votes or {})
+            ):
+                target = p
+                break
+        if target is None and observation.proposals:
+            target = observation.proposals[0]
+        target_id = target.proposal_id if target else "unknown_id"
         return VoteAction(
             type=ActionType.VOTE,
             proposal_id=target_id,
-            vote=VoteChoice.ABSTAIN,
+            vote=VoteChoice.YES,
         )
-        
+
     if ActionType.DEBATE.value in valid_actions:
         return DebateAction(type=ActionType.DEBATE, message=SAFE_FALLBACK_DEBATE)
-        
+
+    if ActionType.ABSTAIN_FROM_PROPOSAL.value in valid_actions:
+        return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
+
     if ActionType.FINISH_DEBATE.value in valid_actions:
-         return FinishDebateAction(type=ActionType.FINISH_DEBATE, reason="Automatic timeout fallback.")
+        return FinishDebateAction(type=ActionType.FINISH_DEBATE, reason="Automatic timeout fallback.")
 
     raise LLMActionError(f"No safe fallback action is valid for this phase. Valid: {valid_actions}")
 
