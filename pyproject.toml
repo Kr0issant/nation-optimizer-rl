@@ -9,6 +9,8 @@ dependencies = [
     "openenv-core>=0.2.3",
     "pydantic>=2.13.3",
     "python-dotenv>=1.2.2",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +37,14 @@ addopts = "-q"
 
 [tool.hatch.build.targets.wheel]
 packages = ["core", "server", "schemas", "agents", "telemetry", "evaluation", "training"]
+include = ["client.py", "openenv.yaml", "Dockerfile"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"core/sectors.json" = "core/sectors.json"
+"core/events.json" = "core/events.json"
+"client.py" = "client.py"
+"openenv.yaml" = "openenv.yaml"
+"Dockerfile" = "Dockerfile"
 
 [build-system]
 requires = ["hatchling"]

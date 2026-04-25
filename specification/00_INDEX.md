@@ -34,6 +34,8 @@
 | `13_RL_ADAPTERS_AND_TRAINING.md` | RL Adapters and Training Plan | Implementation-facing policy adapter, telemetry, evaluation, and training contract |
 | `APPENDIX_A_EXAMPLES.md` | Example Rounds | Annotated example rounds showing complete gameplay |
 
+**OpenEnv Hackathon (external):** minimum submission details (OpenEnv, TRL/Unsloth, Space, evidence, writeup) and judging themes are in `PROBLEM_STATEMENT/` (see the Apr ’26 document). They complement but do not replace mechanics in `01`–`12`; see `11_GUARDRAILS.md`.
+
 ---
 
 ## Recommended Reading Order
