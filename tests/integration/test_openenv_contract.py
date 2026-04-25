@@ -34,7 +34,7 @@ def test_reset_returns_state_and_info_dict():
 
     assert_state_contract(state)
     assert_state_is_serializable(state)
-    assert info == {}
+    assert info == {"episode_started": True, "round": 1}
 
 
 def test_step_returns_openenv_tuple_and_info_contract():

@@ -64,4 +64,4 @@ def test_critical_failure_reward_applies_critical_penalty() -> None:
     reward = _compute_fixture_reward(CRITICAL_FAILURE_REWARD)
 
     assert reward.critical_penalty == -1000.0
-    assert reward.total == pytest.approx(-990.0)
+    assert reward.total == pytest.approx(-983.0922442210181)

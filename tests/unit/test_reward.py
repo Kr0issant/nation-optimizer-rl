@@ -1,12 +1,15 @@
+import math
+
 import pytest
 
 from core.reward import compute_reward
 
 
 def test_reward_includes_prosperity() -> None:
-    reward = compute_reward(prosperity=12.5)
+    reward = compute_reward(prosperity=12.5, population=1)
+    expected = math.log(12.5 * 1 + 1) + 0.5 * math.log(1 + 1)
 
-    assert reward.base_reward == 12.5
+    assert reward.base_reward == pytest.approx(expected)
 
 
 def test_productivity_bonus_formula() -> None:

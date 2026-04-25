@@ -604,27 +604,6 @@ class NationGame:
         else:
             self.shutdown_counter = 0
 
-    def _handle_vote(self, action: Mapping[str, Any], info: dict[str, Any]) -> None:
-        proposal_id = str(action.get("proposal_id", ""))
-        proposal = self._proposal_by_id(proposal_id)
-        agent_id = str(action.get("agent_id") or action.get("agent") or "")
-        vote = self._vote_value(action.get("vote"))
-
-        if proposal is None or proposal.status != PROPOSAL_STATUS_PENDING:
-            info["ignored_actions"].append({"action": dict(action), "reason": "proposal_not_votable"})
-            return
-
-        if agent_id == proposal.agent_id or agent_id == proposal.department:
-            info["ignored_actions"].append({"action": dict(action), "reason": "self_vote"})
-            return
-
-        if agent_id in proposal.votes:
-            info["ignored_actions"].append({"action": dict(action), "reason": "duplicate_vote"})
-            return
-
-        proposal.votes[agent_id] = vote
-        self.votes.append({"proposal_id": proposal_id, "agent_id": agent_id, "vote": vote})
-
     def _advance_phase(self) -> None:
         if self.done:
             return
