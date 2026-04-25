@@ -52,7 +52,8 @@ def test_parliamentary_adapter_parses_budget_action_and_logs_llm_call() -> None:
     assert event.payload["parsed_action"]["type"] == "PROPOSE_BUDGET"
     assert "777" not in client.prompts[0]
     assert "0.42" not in client.prompts[0]
-    assert "9999" not in client.prompts[0]
+    assert "9999" in client.prompts[0]
+    assert "12345" not in client.prompts[0]
 
 
 def test_parliamentary_adapter_falls_back_to_allowed_abstain_on_parse_failure() -> None:
@@ -73,6 +74,31 @@ def test_parliamentary_adapter_falls_back_to_allowed_abstain_on_parse_failure() 
     assert event.payload["completion"] == "I want more money, not JSON."
     assert event.payload["fallback_action"]["type"] == "ABSTAIN_FROM_PROPOSAL"
     assert "parse_error" in event.payload
+
+
+def test_parliamentary_adapter_returns_structurally_valid_rule_breaking_action() -> None:
+    logger = EpisodeLogger(episode_id="episode-1")
+    client = MockTextGenerationClient(
+        [
+            (
+                '{"type":"PROPOSE_BUDGET","department":"Defense",'
+                '"amount":9999,"justification":"Model wants too much."}'
+            )
+        ]
+    )
+
+    action = ParliamentaryLLMAdapter(client, logger=logger).act(
+        _proposal_observation(),
+        {"DEBATE"},
+        "health-minister",
+    )
+
+    assert action.type is ActionType.PROPOSE_BUDGET
+    assert action.department == "Defense"
+    assert action.amount == 9999.0
+    event = logger.events[-1]
+    assert event.payload["parse_ok"] is True
+    assert "fallback_action" not in event.payload
 
 
 def test_dictator_adapter_parses_vote_action_and_logs_llm_call() -> None:
@@ -121,6 +147,22 @@ def test_dictator_adapter_shim_returns_one_action_per_agent() -> None:
     assert len(client.prompts) == 2
 
 
+def test_dictator_oracle_prompt_includes_raw_event_ledger() -> None:
+    client = MockTextGenerationClient(
+        ['{"type":"DEBATE","message":"Oracle sees the full ledger."}']
+    )
+
+    DictatorLLMAdapter(client, oracle=True).act(
+        _event_debate_observation(),
+        {"DEBATE"},
+        "health-minister",
+    )
+
+    assert "9999" in client.prompts[0]
+    assert "12345" in client.prompts[0]
+    assert "severity_multiplier" in client.prompts[0]
+
+
 def test_dictator_adapter_falls_back_to_abstain_vote_on_parse_failure() -> None:
     logger = EpisodeLogger(episode_id="episode-1")
     client = MockTextGenerationClient(["not-json"])
@@ -156,6 +198,14 @@ def _proposal_observation() -> Observation:
                 "narrative": "Hospitals are under pressure.",
                 "cost": 9999,
             },
+            {
+                "name": "Border Tension",
+                "severity": 4,
+                "narrative": "Defense logistics are stressed.",
+                "cost": None,
+                "base_cost": 12345,
+                "severity_multiplier": 2.0,
+            },
         ),
     )
 
@@ -182,4 +232,33 @@ def _debate_observation(department: str) -> Observation:
         phase=Phase.DEBATE,
         treasury=500.0,
         own_department=OwnDepartmentObservation(name=department),
+    )
+
+
+def _event_debate_observation() -> Observation:
+    return Observation(
+        round=2,
+        phase=Phase.DEBATE,
+        treasury=500.0,
+        own_department=OwnDepartmentObservation(
+            name="Health",
+            allocated_budget=777.0,
+            efficiency_rating=0.42,
+        ),
+        event_ledger=(
+            {
+                "name": "Virus Outbreak",
+                "severity": 3,
+                "narrative": "Hospitals are under pressure.",
+                "cost": 9999,
+            },
+            {
+                "name": "Border Tension",
+                "severity": 4,
+                "narrative": "Defense logistics are stressed.",
+                "cost": None,
+                "base_cost": 12345,
+                "severity_multiplier": 2.0,
+            },
+        ),
     )

@@ -23,8 +23,8 @@ class ParliamentaryLLMAdapter(PolicyAdapter):
     """One LLM-backed minister that suggests exactly one structured action.
 
     The prompt contains public observation fields plus the acting department
-    name, but not private departmental metrics or hidden event costs. If strict
-    parsing or phase validation fails, the adapter emits a documented safe
+    name, but not private departmental metrics or unresolved event costs. If
+    strict structural parsing fails, the adapter emits a documented safe
     fallback only when that fallback action type is present in ``valid_actions``.
     """
 
@@ -45,6 +45,8 @@ class ParliamentaryLLMAdapter(PolicyAdapter):
         valid_actions: Iterable[str],
         agent_id: str,
     ) -> Action:
+        if not agent_id.strip():
+            raise ValueError("agent_id must be non-empty.")
         valid_action_set = set(valid_actions)
         prompt = render_action_prompt(
             observation,

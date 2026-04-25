@@ -50,6 +50,8 @@ class DictatorLLMAdapter(PolicyAdapter):
         valid_actions: Iterable[str],
         agent_id: str,
     ) -> Action:
+        if not agent_id.strip():
+            raise ValueError("agent_id must be non-empty.")
         valid_action_set = set(valid_actions)
         prompt = render_action_prompt(
             observation,

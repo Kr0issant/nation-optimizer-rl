@@ -65,10 +65,13 @@ def _oracle_observation(observation: Observation) -> dict[str, Any]:
     return {
         **_public_observation(observation),
         "oracle_own_department": asdict(observation.own_department),
+        "event_ledger": [dict(event) for event in observation.event_ledger],
     }
 
 
 def _sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
+    if event.get("cost") is not None:
+        return {str(key): value for key, value in event.items()}
     return {
         str(key): value
         for key, value in event.items()

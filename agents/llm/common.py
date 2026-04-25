@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from agents.action_parser import ActionParseError, parse_action_json
+from agents.action_parser import parse_action_json
 from schemas.actions import (
     AbstainProposalAction,
     Action,
@@ -78,9 +78,7 @@ def parse_allowed_action(
     valid_actions: set[str],
     agent_id: str,
 ) -> Action:
-    action = parse_action_json(completion)
-    _validate_action(action, observation=observation, valid_actions=valid_actions, agent_id=agent_id)
-    return action
+    return parse_action_json(completion)
 
 
 def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> Action:
@@ -141,30 +139,6 @@ def log_llm_call(
         agent_id=agent_id,
         model=model,
     )
-
-
-def _validate_action(
-    action: Action,
-    *,
-    observation: Observation,
-    valid_actions: set[str],
-    agent_id: str,
-) -> None:
-    if action.type.value not in valid_actions:
-        raise ActionParseError(f"{action.type.value} is not valid in this phase.")
-    if isinstance(action, ProposeBudgetAction):
-        if action.department != observation.own_department.name:
-            raise ActionParseError("PROPOSE_BUDGET department must match the agent portfolio.")
-        if action.amount < 0 or action.amount > observation.treasury:
-            raise ActionParseError("PROPOSE_BUDGET amount must be within the visible treasury.")
-    if isinstance(action, VoteAction):
-        proposal_ids = {proposal.proposal_id for proposal in observation.proposals}
-        if action.proposal_id not in proposal_ids:
-            raise ActionParseError("VOTE proposal_id must refer to an observed proposal.")
-    if isinstance(action, DebateAction) and not action.message.strip():
-        raise ActionParseError("DEBATE message must be non-empty.")
-    if not agent_id.strip():
-        raise ActionParseError("agent_id must be non-empty.")
 
 
 def _optional_int(value: Any) -> int | None:

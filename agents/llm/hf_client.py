@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from importlib import import_module
 from typing import Any, Protocol
 
 DEFAULT_MAX_NEW_TOKENS = 256
@@ -23,8 +24,7 @@ class TextGenerationResult:
 
 
 class TextGenerationClient(Protocol):
-    def generate(self, prompt: str) -> str | TextGenerationResult:
-        """Return a model completion for the provided prompt."""
+    def generate(self, prompt: str) -> str | TextGenerationResult: ...
 
 
 class HuggingFaceTextGenerationClient:
@@ -44,7 +44,7 @@ class HuggingFaceTextGenerationClient:
         temperature: float = 0.2,
     ) -> None:
         try:
-            from huggingface_hub import InferenceClient
+            huggingface_hub = import_module("huggingface_hub")
         except ImportError as exc:
             raise ImportError(
                 "Install huggingface_hub to use HuggingFaceTextGenerationClient."
@@ -55,7 +55,7 @@ class HuggingFaceTextGenerationClient:
             raise ValueError("HF_MODEL_ID or model=... is required.")
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
-        self._client = InferenceClient(
+        self._client = huggingface_hub.InferenceClient(
             model=self.model,
             token=token or os.environ.get("HF_TOKEN"),
         )
