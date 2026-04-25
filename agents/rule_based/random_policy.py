@@ -70,8 +70,9 @@ class RandomAdapter(PolicyAdapter):
 
     @staticmethod
     def _vote_action(proposal: ProposalObservation, vote: VoteChoice) -> Callable[[], VoteAction]:
+        proposal_id = proposal.proposal_id
         return lambda: VoteAction(
             type=ActionType.VOTE,
-            proposal_id=proposal.proposal_id,
+            proposal_id=proposal_id,
             vote=vote,
         )

@@ -33,10 +33,15 @@ class ConservativeAdapter(PolicyAdapter):
                 justification="Request baseline demand to avoid underfunding.",
             )
 
-        if ActionType.VOTE.value in valid_action_set and observation.proposals:
+        other_pending_proposals = [
+            proposal
+            for proposal in observation.proposals
+            if proposal.department != agent_id and proposal.status == "pending"
+        ]
+        if ActionType.VOTE.value in valid_action_set and other_pending_proposals:
             return VoteAction(
                 type=ActionType.VOTE,
-                proposal_id=observation.proposals[0].proposal_id,
+                proposal_id=other_pending_proposals[0].proposal_id,
                 vote=VoteChoice.YES,
             )
 
