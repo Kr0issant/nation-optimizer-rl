@@ -1,0 +1,65 @@
+============================================================
+  CORE ENGINE TEST SUITE
+============================================================
+
+ΓöÇΓöÇ Revenue Curve Tests ΓöÇΓöÇ
+  Γ£ô Below critical ΓåÆ None
+  Γ£ô At critical ΓåÆ 0.0
+  Γ£ô At demand ΓåÆ 1.0
+  Γ£ô At surplus ΓåÆ 1.8
+  Γ£ô At wastage ΓåÆ 1.000000 (Γëê1.0)
+  Γ£ô Beyond wastage ΓåÆ 0.745356 (<1.0)
+  Γ£ô 60% of demand ΓåÆ 0.333333
+  Γ£ô Spec Example 6 (300% demand) ΓåÆ 0.7454 (Γëê0.743)
+  Γ£ô Thresholds at base pop ΓåÆ correct
+  Γ£ô Thresholds at 2x pop ΓåÆ demand doubled
+  Γ£ô Thresholds with event multiplier ΓåÆ demand scaled
+
+ΓöÇΓöÇ Treasury Tests ΓöÇΓöÇ
+  Γ£ô Treasury operations correct
+
+ΓöÇΓöÇ Productivity Tests ΓöÇΓöÇ
+  Γ£ô Productivity unchanged at avg_rf=1.0
+  Γ£ô Productivity +0.04 at avg_rf=1.8
+  Γ£ô Productivity clamped at max=2.0
+
+ΓöÇΓöÇ Population Tests ΓöÇΓöÇ
+  Γ£ô Population growth without crisis ΓåÆ 1,003,000
+  Γ£ô Population decline with crisis ΓåÆ 998486
+
+ΓöÇΓöÇ Event Engine Tests ΓöÇΓöÇ
+
+  Running event engine test...
+  Event distribution over 100 rounds: {'none': 38, 'events': 62}
+  Γ£ô Event engine functional
+
+ΓöÇΓöÇ Game Integration Tests ΓöÇΓöÇ
+
+  Running Spec Example 1 (Normal at demand)...
+  Γ£ô Spec Example 1: Treasury 1000 ΓåÆ 1100 Γ£ô
+
+  Running Spec Example 2 (Surplus zone at 150% demand)...
+  Γ£ô Spec Example 2: Treasury 1000 ΓåÆ 1907.5 Γ£ô
+    (Spec's 1670 doesn't include Phase 8 surplus return of 237.5)
+
+  Running Spec Example 3 (Critical failure)...
+  Γ£ô Critical failure triggered, penalty = -1000.0
+
+  Running time display test...
+  Γ£ô Time display correct: Y1Q1 ΓåÆ Y1Q2 ΓåÆ Y1Q3 ΓåÆ Y1Q4 ΓåÆ Y2Q1
+
+  Running shutdown test...
+  Γ£ô Zero allocation triggers critical failure (0 < critical threshold)
+
+  Running full 50-round episode at ~130% demand...
+  Survived 41 rounds
+  Final treasury: 29074.60
+  Final productivity: 1.5897
+  Final population: 1,178,021
+  Termination: CRITICAL_FAILURE
+  Final reward total: -560.5169
+  Γ£ô Survived 40+ rounds (target met)
+
+============================================================
+  ALL TESTS PASSED Γ£ô
+============================================================
