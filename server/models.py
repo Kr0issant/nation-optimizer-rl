@@ -3,8 +3,32 @@
 from __future__ import annotations
 
 from typing import Any
-from pydantic import BaseModel, Field
-from openenv_core import Observation, Action, State
+
+from pydantic import BaseModel, ConfigDict, Field
+
+try:
+    from openenv.core.env_server import Action, Observation, State
+except ImportError:  # pragma: no cover - fallback for local tests before sync
+    try:
+        from openenv_core import Action, Observation, State
+    except ImportError:  # pragma: no cover
+        class Action(BaseModel):
+            model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+            metadata: dict[str, Any] = Field(default_factory=dict)
+
+        class Observation(BaseModel):
+            model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+            done: bool = False
+            reward: bool | int | float | None = None
+            metadata: dict[str, Any] = Field(default_factory=dict)
+
+        class State(BaseModel):
+            model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+            episode_id: str | None = None
+            step_count: int = 0
 
 
 # --- Supporting Models ---
@@ -51,6 +75,7 @@ class OwnDepartmentModel(BaseModel):
     consumption: float | None = None
     surplus: float | None = None
     efficiency_rating: float | None = None
+    treasury_surplus_returned_this_round: float | None = None
     baseline: float | None = None
 
 
@@ -85,7 +110,7 @@ class ParliamentaryAction(Action):
 
     def to_engine_dict(self) -> dict[str, Any]:
         """Convert to the dict format expected by core/game.py step()."""
-        d: dict[str, Any] = {"type": self.type, "agent_id": self.agent_id}
+        d: dict[str, Any] = {"type": self.type, "agent_id": self.agent_id, "_hold_phase": True}
         if self.type == "DEBATE":
             d["message"] = self.message or ""
         elif self.type == "PROPOSE_BUDGET":
@@ -114,6 +139,8 @@ class ParliamentaryObservation(Observation):
     round: int = 0
     phase: int = 1
     phase_name: str = "EVENT_REVELATION"
+    year: int = 1
+    quarter: int = 1
     treasury: float = 0.0
     population: int = 0
     productivity: float = 1.0

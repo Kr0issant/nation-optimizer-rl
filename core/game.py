@@ -207,6 +207,8 @@ class NationGame:
         self._proposal_counter = 0
         self._submitted_departments: set[str] = set()
         self._abstained_departments: set[str] = set()
+        self._last_step_action_count = 0
+        self._hold_phase_requested = False
 
         self.treasury = Treasury(
             balance=self.config.INITIAL_TREASURY,
@@ -283,8 +285,11 @@ class NationGame:
         if self._is_allocation_mapping(action):
             return self._run_direct_allocation_round(action)
 
+        normalized_actions = self._normalize_actions(action)
+        self._last_step_action_count = len(normalized_actions)
+        self._hold_phase_requested = any(bool(item.get("_hold_phase")) for item in normalized_actions)
         info: dict[str, Any] = {"accepted_actions": [], "ignored_actions": [], "rejected_actions": []}
-        for item in self._normalize_actions(action):
+        for item in normalized_actions:
             self._handle_phase_action(item, info)
 
         self._run_current_system_phase(info)
@@ -493,6 +498,7 @@ class NationGame:
         critical_failed = any(
             sector.is_critical_failure(self.population.value)
             for sector in self.sectors.values()
+            if sector.name in approved_departments
         )
         if critical_failed:
             self.last_total_allocation = sum(sector.allocation for sector in self.sectors.values())
@@ -560,11 +566,12 @@ class NationGame:
         )
         self.last_reward = compute_reward(
             sectors=self.sectors,
-            total_revenue=self.last_total_revenue,
-            population=self.population.value,
+            total_revenue=None if critical_failed else self.last_total_revenue,
+            population=0 if critical_failed else self.population.value,
             productivity=self.productivity.value,
             round_num=completed_round,
             critical_failed=critical_failed,
+            prosperity=0.0 if critical_failed else None,
             **zone_penalty_overrides,
             productivity_bonus_scale=self.config.PRODUCTIVITY_BONUS_SCALE,
             survival_bonus_per_round=self.config.SURVIVAL_BONUS_PER_ROUND,
@@ -604,45 +611,26 @@ class NationGame:
         else:
             self.shutdown_counter = 0
 
-    def _handle_vote(self, action: Mapping[str, Any], info: dict[str, Any]) -> None:
-        proposal_id = str(action.get("proposal_id", ""))
-        proposal = self._proposal_by_id(proposal_id)
-        agent_id = str(action.get("agent_id") or action.get("agent") or "")
-        vote = self._vote_value(action.get("vote"))
-
-        if proposal is None or proposal.status != PROPOSAL_STATUS_PENDING:
-            info["ignored_actions"].append({"action": dict(action), "reason": "proposal_not_votable"})
-            return
-
-        if agent_id == proposal.agent_id or agent_id == proposal.department:
-            info["ignored_actions"].append({"action": dict(action), "reason": "self_vote"})
-            return
-
-        if agent_id in proposal.votes:
-            info["ignored_actions"].append({"action": dict(action), "reason": "duplicate_vote"})
-            return
-
-        proposal.votes[agent_id] = vote
-        self.votes.append({"proposal_id": proposal_id, "agent_id": agent_id, "vote": vote})
-
     def _advance_phase(self) -> None:
         if self.done:
             return
 
         if self.phase == Phase.DEBATE:
-            # Debate stays until force_advance_phase is called
-            return
+            # The OpenEnv wrapper can hold debate for multi-agent turns, while
+            # core callers keep the original no-op phase advancement contract.
+            if getattr(self, "_hold_phase_requested", False):
+                return
 
         if self.phase == Phase.PROPOSAL:
             # Only advance if all departments have either submitted or abstained
             total_active = len(self._submitted_departments) + len(self._abstained_departments)
-            if total_active < len(self.sectors):
+            if total_active < len(self.sectors) and getattr(self, "_hold_phase_requested", False):
                 return
 
         if self.phase == Phase.VOTING:
             # Only advance if all pending proposals have been voted on by everyone else
             pending = [p for p in self.proposals if p.status == PROPOSAL_STATUS_PENDING]
-            if pending:
+            if pending and getattr(self, "_hold_phase_requested", False):
                 for p in pending:
                     # Everyone except the proposer must vote
                     required_votes = len(self.sectors) - 1

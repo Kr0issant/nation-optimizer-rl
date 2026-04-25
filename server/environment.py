@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from openenv_core import Environment
-
 from core.game import NationGame
 from schemas.phases import Phase, valid_action_types_for_phase
 from server.models import (
@@ -17,6 +15,16 @@ from server.models import (
     VoteModel,
     OwnDepartmentModel,
 )
+
+try:
+    from openenv.core.env_server import Environment
+except ImportError:  # pragma: no cover - fallback for local tests before sync
+    try:
+        from openenv_core import Environment
+    except ImportError:  # pragma: no cover
+        class Environment:
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                del args, kwargs
 
 # Maximum retry attempts for rejected proposals before fallback
 MAX_PROPOSAL_RETRIES = 2
@@ -35,6 +43,8 @@ class NationEnvironment(Environment):
     times). After retries are exhausted, rejected departments receive baseline
     demand as a fallback.
     """
+
+    SUPPORTS_CONCURRENT_SESSIONS = True
 
     def __init__(self, seed: int | None = None):
         super().__init__()
@@ -228,7 +238,11 @@ class NationEnvironment(Environment):
                 severity=e.get("severity", 0),
                 category=e.get("category", ""),
                 narrative=e.get("narrative", ""),
-                affected_departments=e.get("affected_departments", []),
+                affected_departments=list(
+                    (e.get("affected_departments") or e.get("affected_sectors") or {}).keys()
+                    if isinstance(e.get("affected_departments") or e.get("affected_sectors"), dict)
+                    else e.get("affected_departments") or e.get("affected_sectors") or []
+                ),
                 round=e.get("round"),
                 cost=e.get("cost"),
             )
@@ -271,6 +285,7 @@ class NationEnvironment(Environment):
                 consumption=s.get("consumption"),
                 surplus=s.get("surplus"),
                 efficiency_rating=s.get("revenue_factor"),
+                treasury_surplus_returned_this_round=s.get("surplus"),
                 baseline=s.get("baseline"),
             )
 
@@ -285,6 +300,8 @@ class NationEnvironment(Environment):
             round=gs.get("round", 0),
             phase=int(gs.get("phase", 1)),
             phase_name=gs.get("phase_name", ""),
+            year=gs.get("year", 1),
+            quarter=gs.get("quarter", 1),
             treasury=gs.get("treasury", 0.0),
             population=gs.get("population", 0),
             productivity=gs.get("productivity", 1.0),

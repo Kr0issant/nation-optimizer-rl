@@ -5,8 +5,10 @@ description = "OpenEnv-compatible multi-agent RL environment for parliamentary r
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "openenv-core>=0.2.3",
+    "fastapi>=0.104.0",
+    "openenv-core==0.2.3",
     "pydantic>=2.13.3",
+    "uvicorn[standard]>=0.24.0",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +35,7 @@ addopts = "-q"
 
 [tool.hatch.build.targets.wheel]
 packages = ["core", "server", "schemas", "agents", "telemetry", "evaluation", "training"]
+include = ["client.py", "openenv.yaml", "Dockerfile"]
 
 [build-system]
 requires = ["hatchling"]

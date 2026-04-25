@@ -121,6 +121,22 @@ uv run python -m evaluation.benchmark_policies
 
 Core game rules live in the engine layer; policy adapters consume observations and emit structured actions only. Central telemetry writes JSONL rollout records that can be reused for plots, evaluation, and training datasets.
 
+### Run the Server / Space
+
+The OpenEnv-compatible server wraps `core.game.NationGame` without changing game rules. It uses `openenv-core==0.2.3`, exposes the parliamentary action/observation models through `server.app:app`, and is configured for Hugging Face Space hosting through `openenv.yaml`.
+
+```bash
+uv sync --extra dev
+uv run uvicorn server.app:app --host 0.0.0.0 --port 8000
+```
+
+For Docker or Space smoke tests:
+
+```bash
+docker build -t nation-optimizer-rl .
+docker run --rm -p 8000:8000 nation-optimizer-rl
+```
+
 ### LLM adapters
 
 `agents.llm.ParliamentaryLLMAdapter` runs one model-backed minister per acting agent. It builds prompts from legal public observation fields, asks for exactly one JSON action, parses through the strict action parser, and logs each call as `LLM_CALL` telemetry with prompt, completion, parse outcome, parsed or fallback action, and token counts when the client reports them.
