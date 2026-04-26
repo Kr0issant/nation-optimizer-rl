@@ -26,6 +26,7 @@ the training curve directly.
 #     "bitsandbytes>=0.43.0",
 #     "huggingface-hub>=0.24.0",
 #     "pydantic>=2.8.0",
+#     "torchvision",
 # ]
 # ///
 
