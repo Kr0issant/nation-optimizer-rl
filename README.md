@@ -1,8 +1,28 @@
+---
+title: Nation Optimizer RL
+emoji: 🏛️
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_file: server/app.py
+pinned: false
+---
+
 # Nation Optimizer RL
 
 > A centralized planning environment where LLMs learn resource allocation through structured parliamentary reasoning. Inspired by the Marxist principle: *"From each according to his ability, to each according to his need."*
 
-![Project Poster](assets/poster.png)
+---
+
+### 🔗 Submission Quick-Links
+*   **🚀 Hugging Face Space**: [Nation Optimizer Spectator Dashboard](https://huggingface.co/spaces/Kr0issant/nation-optimizer-rl)
+*   **📓 Training Notebook**: [Open in Colab (training.ipynb)](https://colab.research.google.com/github/Kr0issant/communism-optimizer-rl/blob/main/training.ipynb)
+*   **📊 Training Evidence**: [Reward & Loss Curves](assets/results/)
+*   **📽️ Project Presentation**: [YouTube Video / Blog Post Placeholder](https://huggingface.co/blog/your-username/nation-optimizer)
+
+---
+
+![Project Poster](C:\Users\algor\.gemini\antigravity\brain\0e316500-e2f8-44f4-a00c-a09618e008f7\project_poster_1777182682922.png)
 
 ## Overview
 
