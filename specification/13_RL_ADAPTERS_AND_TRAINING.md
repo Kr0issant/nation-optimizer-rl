@@ -6,7 +6,7 @@
 
 ## Purpose
 
-The environment is designed to train and evaluate LLM agents on cooperative long-horizon resource allocation. The RL layer must make that trainable by providing:
+The environment is designed to train and evaluate an LLM on long-horizon resource allocation through structured reasoning. The RL layer must make that trainable by providing:
 
 - structured policy adapter interfaces
 - reproducible baseline comparisons
@@ -86,22 +86,25 @@ Purpose:
 
 ### Parliamentary LLM Adapter
 
-Multiple LLM-backed ministers debate publicly, propose budgets, and vote.
+The same underlying LLM is called multiple times with different minister role prompts to simulate debate, proposals, and voting.
 
 Purpose:
 
-- evaluate whether debate improves information aggregation
-- test long-horizon cooperation under partial observability
+- evaluate whether structured reasoning (debate + voting) improves long-horizon planning
+- test interpretability through reasoning traces under partial observability
 - produce interpretable transcripts for storytelling
+
+**Important**: This is NOT multi-agent RL. There is one model with multiple role-play prompts. The "parliament" is cognitive scaffolding—interpretable structure wrapped around a single learner.
 
 ### Dictator LLM Adapter
 
-A single LLM produces an allocation plan for the parliament.
+The same underlying LLM receives a single central-planner prompt that directly outputs allocations for all departments.
 
 Purpose:
 
-- compare decentralized debate against centralized planning
-- provide a useful storytelling contrast
+- compare structured reasoning (parliamentary) against direct planning (dictator)
+- provide an opaque baseline using identical model capacity
+- isolate the effect of reasoning structure on performance
 
 Two variants are allowed:
 
