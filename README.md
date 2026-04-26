@@ -1,53 +1,58 @@
 # Nation Optimizer RL
 
-> A multi-agent reinforcement learning environment simulating cooperative parliamentary resource allocation. Inspired by the Marxist principle: *"From each according to his ability, to each according to his need."*
+> A centralized planning environment where LLMs learn resource allocation through structured parliamentary reasoning. Inspired by the Marxist principle: *"From each according to his ability, to each according to his need."*
 
 ![Project Poster](assets/poster.png)
 
 ## Overview
 
-This project is a **cooperative multi-agent RL environment** where LLM-powered ministers collectively manage a nation's treasury through sequential budget negotiations, voting, and debate.
+This project is a **centralized planning environment** where a single LLM learns resource allocation through structured parliamentary reasoning. The "ministers" are role-play personas—not independent learners—used to scaffold interpretable decision-making via debate and voting.
 
-- **Agents**: Ministers with distinct departmental portfolios (Health, Defense, Agriculture, Education, Commerce, Social)
-- **Mechanism**: Sequential budget proposals with public voting rounds
-- **Reward**: Collective prosperity (GDP per capita) — all agents succeed or fail together
-- **Uncertainty**: Stochastic events with hidden costs force agents to infer needs from partial information
+- **Architecture**: One underlying LLM called multiple times with different role prompts (parliamentary wrapper vs. direct dictator baseline)
+- **Mechanism**: Sequential budget proposals with public voting rounds (interpretability through structured reasoning)
+- **Reward**: Prosperity (GDP per capita) over long horizons (450 steps/episode)
+- **Uncertainty**: Stochastic events with hidden costs force reasoning under partial observability
 - **Constraint**: No debt allowed. Bankruptcy = episode failure.
 
 ## What This Model Captures
 
-Despite its simplifications, the simulation captures five core dynamics of collective governance:
+This is **NOT a multi-agent system**—it is single-agent planning with a parliamentary narrative wrapper. The same underlying LLM is called multiple times with different minister role prompts. The "parliament" serves as cognitive scaffolding: structured reasoning (debate + voting) that makes the model's allocation decisions interpretable.
 
-1. **Cooperation under uncertainty**
-   > Can agents share limited resources when each department's true needs are hidden?
+Despite its simplifications, the simulation captures five core dynamics of resource allocation:
 
-2. **Sequential negotiation**
+1. **Planning under uncertainty**
+   > Can the model allocate limited resources when each department's true needs are hidden?
+
+2. **Sequential reasoning**
    > How does proposal order affect outcomes? Does the first proposer capture the treasury?
 
-3. **Collective action**
-   > Can agents avoid the tragedy of the commons when everyone draws from the same pool?
+3. **Long-horizon tradeoffs**
+   > Can the model balance immediate needs against future crises over 450 steps?
 
 4. **Forward-looking behavior**
-   > Do agents save surplus for future crises, or spend everything now?
+   > Does the model save surplus for future crises, or spend everything now?
 
-5. **Information aggregation**
-   > Can parliament infer hidden states (event costs) from public debate and severity signals?
+5. **Interpretability through structure**
+   > Can parliamentary debate and voting traces explain allocation decisions?
 
-## The Core Theoretical Question
+## The Core Research Question
 
-> **"Under what conditions do self-interested agents (operating under collective reward) achieve cooperative resource allocation comparable to a central planner with perfect information?"**
+> **"Can structured reasoning (parliamentary debate + voting) improve long-horizon resource allocation compared to direct central planning?"**
 
-This is essentially asking: *Can decentralized voting approximate optimal planning?*
+This asks whether interpretable cognitive scaffolding (parliamentary reasoning traces) improves planning performance over opaque direct allocation, particularly under partial observability and sparse rewards.
 
 In economics, this connects to:
-- **Hayek's Knowledge Problem**: Can dispersed information be aggregated through voting?
-- **Mechanism Design**: Can rules align individual and collective incentives?
-- **Computational Social Choice**: How hard is it to compute fair allocations?
-- **Cooperative Game Theory**: Can the core be reached through negotiation?
+- **Keynesian**: Counter-cyclical spending and demand management
+- **Soviet Planning**: Centralized resource allocation challenges
+- **Public Choice**: Institutional rules and voting dynamics
+- **Neoclassical Growth**: Per-capita output and productivity
+- **Information Economics**: Decision-making under uncertainty
+- **Explainable AI**: Interpretability through structured reasoning traces
+- **Marxist Distribution**: Collective benefit over individual gain
 
 ## Theoretical Assumptions
 
-The simulation makes explicit assumptions from several economic traditions:
+The simulation makes explicit assumptions from several economic and AI traditions:
 
 | Tradition | Assumption | Our Implementation |
 |-----------|-----------|-------------------|
@@ -55,9 +60,10 @@ The simulation makes explicit assumptions from several economic traditions:
 | **Soviet Planning** | Centralized allocation | All resources flow through treasury; no private market |
 | **Public Choice** | Voting determines budgets | Majority rule with rotating proposal order |
 | **Neoclassical Growth** | Population affects per-capita output | `Prosperity = Output / Population` with exogenous growth |
-| **Information Economics** | Uncertainty requires inference | Agents observe severity + narrative, NOT exact cost |
+| **Information Economics** | Uncertainty requires inference | Model observes severity + narrative, NOT exact cost |
 | **Austrian/Black Swan** | Rare extreme events disrupt equilibrium | 40% normal rounds, 1% black swan crises |
-| **Marxist Distribution** | Collective reward | All agents receive identical reward |
+| **Explainable AI** | Interpretability through structure | Parliamentary debate traces expose reasoning steps |
+| **Marxist Distribution** | Collective reward | Single reward signal for all allocations |
 | **Institutional Economics** | Rules shape behavior | Hard constraints (no debt, no self-voting, rotating order) |
 
 ## Specification
@@ -163,9 +169,13 @@ docker run --rm -p 8000:8000 nation-optimizer-rl
 
 ### LLM adapters
 
-`agents.llm.ParliamentaryLLMAdapter` runs one model-backed minister per acting agent. It builds prompts from legal public observation fields, asks for exactly one JSON action, parses through the strict action parser, and logs each call as `LLM_CALL` telemetry with prompt, completion, parse outcome, parsed or fallback action, and token counts when the client reports them.
+Both adapters use the **same underlying LLM**—the difference is in the prompt wrapper, not the model weights:
 
-`agents.llm.DictatorLLMAdapter` uses a single central-planner prompt while preserving the same one-action adapter boundary. Because the current environment API validates per-agent actions, its `act_for_agents` shim calls the model one agent at a time instead of bypassing parliament or changing collective reward math. The default path is non-oracle; `oracle=True` is only for explicitly gated research comparisons.
+**`agents.llm.ParliamentaryLLMAdapter`**: Calls the model multiple times with different minister role prompts (Health, Defense, etc.), each generating debate messages, proposals, or votes. This creates an **interpretable reasoning path**—the parliamentary debate traces expose the model's allocation rationale.
+
+**`agents.llm.DictatorLLMAdapter`**: Calls the same model with a single central-planner prompt that directly outputs allocations for all departments. This provides an **opaque baseline** for comparison—same model capacity, but without structured reasoning traces.
+
+Both adapters parse structured JSON actions, validate against the action schema, and log `LLM_CALL` telemetry. The Dictator's `act_for_agents` shim calls the model one department at a time to preserve API compatibility, but this is an implementation detail—not independent agents.
 
 Tests and CI should use mock `TextGenerationClient` implementations, so no network or `HF_TOKEN` is required. For live inference, install `huggingface_hub`, set `HF_TOKEN` and `HF_MODEL_ID`, and construct `HuggingFaceTextGenerationClient`. Training and fine-tuning are separate from these inference adapters and belong to Mega 4 under `training/`.
 
@@ -223,6 +233,23 @@ The benchmark CLI runs the trained LoRA, the untrained base model, and the rule-
 
 #### Reward Landscape
 ![Reward Landscape](assets/results/reward_landscape.png)
+
+## Hackathon Theme Alignment
+
+This project aligns with OpenEnv Hackathon themes as follows:
+
+### Primary: Theme #2 — Long-Horizon Planning & Instruction Following
+- **450 steps per episode**: Sparse rewards force the model to learn credit assignment over extended horizons
+- **Budget constraints propagate**: Decisions in early rounds affect available resources 50+ steps later
+- **No myopic shortcuts**: Immediate consumption vs. future crisis preparation requires genuine foresight
+
+### Secondary: Theme #3.1 — World Modeling
+- **Economic feedback loops**: Spending → productivity → revenue → future spending capacity
+- **Hidden state inference**: Model must infer true event costs from severity signals and narrative
+- **Cascading failure modes**: Health crises reduce population, which reduces productivity, which reduces revenue
+
+### Not Theme #1 (Multi-Agent)
+This is explicitly **not** a multi-agent system. There is one learner—the underlying LLM. The "parliament" is a structured reasoning scaffold, not independent agents with separate gradients.
 
 ## Hackathon Context
 
