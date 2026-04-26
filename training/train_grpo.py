@@ -50,7 +50,7 @@ if os.environ.get("NATION_TRAIN_DEBUG", "").lower() in ("1", "true", "yes"):
     print(f"DEBUG: sys.path={sys.path}", file=sys.stderr)
 
 
-DEFAULT_BASE_MODEL = "Qwen/Qwen3.5-4B"
+DEFAULT_BASE_MODEL = "google/gemma-2b-it"
 # Regenerate with `python -m scripts.collect_grpo_prompts` after game/economy changes.
 # Dataset and model repo ids use NATION_HF_USER (default Hugging Face account for
 # this project). A Space may be published on a *community* HF account; that is not a
