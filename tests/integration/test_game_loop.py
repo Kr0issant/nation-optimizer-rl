@@ -461,11 +461,15 @@ def test_shutdown_triggered_by_zero_discretionary_two_rounds() -> None:
     advance_to_phase(game, Phase.PROPOSAL)
     game.step([proposal(d, amount=0.0) for d in DEPARTMENTS])
     approve_all_pending_proposals(game)
+<<<<<<< Updated upstream
     while game.phase != Phase.EVENT_REVELATION and not game.done:
         if game.phase == Phase.DEBATE:
             game.force_advance_phase()
         else:
             game.step()
+=======
+    game.step()  # Phase 5: first round with zero discretionary
+>>>>>>> Stashed changes
 
     assert game.shutdown_counter == 1
     assert not game.done
@@ -474,11 +478,15 @@ def test_shutdown_triggered_by_zero_discretionary_two_rounds() -> None:
     advance_to_phase(game, Phase.PROPOSAL)
     game.step([proposal(d, amount=0.0) for d in DEPARTMENTS])
     approve_all_pending_proposals(game)
+<<<<<<< Updated upstream
     while game.phase != Phase.EVENT_REVELATION and not game.done:
         if game.phase == Phase.DEBATE:
             game.force_advance_phase()
         else:
             game.step()
+=======
+    game.step()  # Phase 5: second consecutive zero discretionary
+>>>>>>> Stashed changes
 
     assert game.shutdown_counter == 2
     assert game.done
@@ -519,19 +527,33 @@ def test_no_critical_failure_after_revenue_round() -> None:
 def test_direct_allocation_applies_auto_critical_first() -> None:
     """Direct allocation shortcut auto-funds critical, then applies input as discretionary."""
     game = make_game()
+<<<<<<< Updated upstream
     # Input mapping is legacy total desired allocation per department; engine splits
     # into critical + discretionary after auto-funding critical.
+=======
+    # Direct allocation input: {Dept: total_requested}
+    # Should be interpreted as: {Dept: discretionary_above_critical}
+>>>>>>> Stashed changes
     safe = {
         dept: baseline * 1.3 for dept, baseline in game.config.SECTOR_BASELINES.items()
     }
     result = game.step(safe)
 
     assert not result.done
+<<<<<<< Updated upstream
     pop = int(result.observation["population"])
     for dept in DEPARTMENTS:
         alloc = result.observation["sectors"][dept]["allocation"]
         crit = game.sectors[dept].critical(pop)
         assert alloc >= float(crit)
+=======
+    # Verify auto-critical was applied
+    total_c = game._total_critical_funding()
+    # Verify each department got at least critical
+    for dept in DEPARTMENTS:
+        sector = game.sectors[dept]
+        assert sector.allocation >= float(sector.critical(game.population.value))
+>>>>>>> Stashed changes
 
 
 def test_seeded_reset_is_deterministic() -> None:

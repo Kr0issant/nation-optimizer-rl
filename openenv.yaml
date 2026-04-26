@@ -1,6 +1,6 @@
 spec_version: 1
 name: nation_optimizer_rl
-type: space
-runtime: fastapi
+type: app
+runtime: docker
 app: server.app:app
 port: 8000
