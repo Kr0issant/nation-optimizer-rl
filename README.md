@@ -4,7 +4,9 @@ emoji: 🏛️
 colorFrom: blue
 colorTo: purple
 sdk: docker
-app_file: app.py
+sdk_version: "6.13.0"
+python_version: "3.11"
+app_port: 8000
 pinned: false
 ---
 
