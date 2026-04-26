@@ -68,6 +68,9 @@ class ParliamentaryAction(Action):
       - FINISH_DEBATE:          requires `reason`
       - PROPOSE_BUDGET:         requires `department`, `amount`, `justification`
       - VOTE:                   requires `proposal_id`, `vote`
+
+    ``amount`` in PROPOSE_BUDGET is discretionary funding above the auto-funded
+    critical floor (see Option A in game rules).
     """
 
     agent_id: str
@@ -100,8 +103,6 @@ class ParliamentaryAction(Action):
         elif self.type == "VOTE":
             d["proposal_id"] = self.proposal_id or ""
             d["vote"] = str(self.vote) if self.vote else "ABSTAIN"
-        elif self.type == "ABSTAIN_FROM_PROPOSAL":
-            d["department"] = self.department or self.agent_id
         return d
 
 

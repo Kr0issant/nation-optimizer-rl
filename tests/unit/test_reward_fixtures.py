@@ -21,7 +21,6 @@ def _compute_fixture_reward(scenario: RewardScenario) -> RewardBreakdown:
         rounds_survived=scenario.rounds_survived,
         over_allocated_count=economy.over_allocated_count,
         under_allocated_count=economy.under_allocated_count,
-        critical_failure_occurred=economy.critical_failure,
     )
 
 
@@ -60,8 +59,9 @@ def test_profit_zone_reward_has_no_allocation_penalties() -> None:
     assert reward.critical_penalty == 0.0
 
 
-def test_critical_failure_reward_applies_critical_penalty() -> None:
+def test_below_critical_fixture_has_no_critical_termination_penalty() -> None:
+    """Economy fixtures may mark RF=None below critical; reward has no -1000 term (Option A)."""
     reward = _compute_fixture_reward(CRITICAL_FAILURE_REWARD)
 
-    assert reward.critical_penalty == -1000.0
-    assert reward.total == pytest.approx(-990.0)
+    assert reward.critical_penalty == 0.0
+    assert reward.total == pytest.approx(10.0)

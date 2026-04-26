@@ -6,47 +6,24 @@
 
 ## Episode Termination Conditions
 
-### Critical Failure (Immediate Termination)
-
-The episode ends immediately in failure when **ANY** department's allocation falls below its Critical Threshold.
-
-- **Critical Threshold**: 40% of Demand
-- **Trigger**: `Allocation_d < Critical_d` for any department
-- **Check Timing**: Immediately after budget allocation (Phase 5)
-- **Result**: Episode terminates with CRITICAL FAILURE status
-
-When critical failure occurs:
-- All agents receive a critical failure penalty of -1000 in that step's reward
-- All subsequent steps receive 0 reward
-- Final prosperity calculated as: `(Treasury + sum(Revenues)) / Population`
-
-**Critical Threshold Behavior**:
-| Allocation | Result |
-|------------|--------|
-| < 40% of Demand | CRITICAL FAILURE (game over) |
-| 40% of Demand | Break-even (revenue factor = 0) |
-| 100% of Demand | Break-even (revenue factor = 1.0) |
-| 150% of Demand | Peak profit (revenue factor = 1.8) |
-| > 250% of Demand | Diminishing returns (wastage zone) |
-
 ### Bankruptcy (Failure)
 
-The episode ends in failure when Treasury drops to 0 or below after same-round revenue calculation.
+The episode ends in failure when the treasury is insolvent relative to game rules.
 
-- **Check Timing**: End of Phase 5 (Budget Execution) after revenue applied
-- **Formula**: `Treasury_t = Treasury_{t-1} + Baseline_Tax + Sum(Revenues_t) - Sum(Allocations_d)`
-- **Bankruptcy**: `Treasury_t <= 0`
+- **Phase 5 (immediate path)**: If `Treasury < sum(Critical_d)` at the start of budget execution, the episode ends with **BANKRUPTCY** (cannot pay mandatory auto-critical)
+- **General path**: Treasury at or below zero after debits / standard checks (see Termination Check Phase)
+- **Check Timing**: Phase 5 for mandatory-funding bankruptcy; Phase 9 (and other guards) for zero-balance bankruptcy
 
 When bankruptcy occurs:
-- All agents receive a bankruptcy penalty of -1000 in that step's reward
+- All agents receive a bankruptcy penalty of -1000 in that step's reward (reference implementation)
 - All subsequent steps receive 0 reward
 - Episode total is capped below potential maximum
 
 ### Shutdown (Governance Collapse)
 
-The episode ends with status SHUTDOWN when total allocation equals zero for 2 consecutive rounds.
+The episode ends with status SHUTDOWN when **total approved discretionary** is zero for 2 consecutive rounds.
 
-- **Trigger**: `sum(Allocation_d) = 0` for 2 consecutive rounds
+- **Trigger**: `sum(Discretionary_d) = 0` for 2 consecutive rounds (Option A)
 - **Check Timing**: Phase 9 (Termination Check)
 
 When shutdown occurs:
@@ -101,7 +78,7 @@ When shutdown occurs:
 | **Strong** | Survives 40+ rounds with final prosperity > 2500 | 80% of marks |
 | **Competent** | Survives 30+ rounds with final prosperity > 1500 | 60% of marks |
 | **Developing** | Survives 20+ rounds with final prosperity > 800 | 40% of marks |
-| **Failed** | Critical failure before round 15 | No marks |
+| **Failed** | Bankruptcy or shutdown before round 15 | No marks |
 
 ---
 
@@ -120,11 +97,10 @@ When shutdown occurs:
 ### End State
 
 Episode concludes when any termination condition is met:
-1. **Critical Failure**: Any department allocated below Critical Threshold (40% of Demand)
-2. **Bankruptcy**: Treasury <= 0 after same-round revenue calculation
-3. **Shutdown**: Zero total allocation for 2 consecutive rounds
-4. **Max Rounds**: Episode reaches round 50 (12.5 years)
-5. **Prosperity Threshold**: Per-capita income meets threshold for 5 consecutive rounds
+1. **Bankruptcy**: Treasury cannot pay mandatory critical at Phase 5, or treasury <= 0 per termination checks
+2. **Shutdown**: Zero **total discretionary** for 2 consecutive rounds
+3. **Max Rounds**: Episode reaches round 50 (12.5 years)
+4. **Prosperity Threshold**: Per-capita income meets threshold for 5 consecutive rounds
 
 ### State Transitions
 
@@ -147,8 +123,8 @@ Termination Check (Phase 9)
 
 - **Behavior**: Random budget proposals across the full allocation range
 - **Expected Survival**: 5-10 rounds
-- **Characterization**: High probability of critical failure due to uncoordinated random allocations
-- **Why It Fails**: No learning; random proposals frequently allocate below critical threshold (< 40% of demand), triggering immediate episode termination
+- **Characterization**: High probability of bankruptcy or shutdown due to uncoordinated random discretionary requests
+- **Why It Fails**: No learning; random policy misallocates discretionary spend and bleeds treasury on auto-critical (RF=0 at critical) until bankruptcy or zero-discretionary shutdown
 
 ### Greedy Agent Baseline
 
@@ -175,8 +151,8 @@ Termination Check (Phase 9)
 
 | Allocation (% of Demand) | Revenue Factor | Zone |
 |--------------------------|----------------|------|
-| 0-39% | FAIL | Critical (game over) |
-| 40% | 0.0 | Critical (break-even) |
+| 0-39% | N/A | Sub-critical RF undefined; Option A funds at least critical when solvent |
+| 40% | 0.0 | At critical (zero revenue) |
 | 60% | 0.5 | Underfunded |
 | 80% | 0.75 | Underfunded |
 | 100% | 1.0 | Break-even (demand) |
@@ -229,7 +205,7 @@ For each trained agent evaluation, record:
 
 ## Design Rationale
 
-- **Critical failure as immediate termination**: Creates the highest stakes for budget allocation. A single department below 40% of demand ends the episode, forcing careful coordination across all departments.
+- **Mandatory critical with zero RF**: Auto-critical guarantees survival funding when solvent but generates no revenue, so episodes hinge on coordinated **discretionary** investment and treasury health (bankruptcy) rather than a separate “critical failure” termination.
 - **Prosperity threshold for success**: Provides a concrete winning condition that requires sustained performance, not just survival. Five consecutive rounds above threshold demonstrates stable governance.
 - **Four baseline comparisons**: Give clear benchmarks at different strategy complexity levels. The optimal baseline (~1.3× demand) demonstrates the profit zone insight.
 - **Revenue factor as key metric**: Since revenue factor directly determines treasury growth, tracking average revenue factor across episodes provides clear signal of agent performance.

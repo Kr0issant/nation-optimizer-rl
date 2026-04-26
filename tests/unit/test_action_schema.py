@@ -50,3 +50,12 @@ def test_phase_action_mapping_matches_spec() -> None:
     assert valid_action_types_for_phase(Phase.PROPOSAL) == frozenset({"PROPOSE_BUDGET"})
     assert valid_action_types_for_phase(Phase.VOTING) == frozenset({"VOTE"})
     assert ActionType.DEBATE.value in valid_action_types_for_phase(Phase.DEBATE)
+
+
+def test_proposal_phase_allows_only_propose_budget() -> None:
+    assert valid_action_types_for_phase(Phase.PROPOSAL) == frozenset({"PROPOSE_BUDGET"})
+
+
+def test_proposal_phase_does_not_include_abstain() -> None:
+    abstains = valid_action_types_for_phase(Phase.PROPOSAL) & {"ABSTAIN_FROM_PROPOSAL"}
+    assert len(abstains) == 0

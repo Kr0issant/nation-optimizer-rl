@@ -8,34 +8,35 @@
 
 ### 1. PROPOSE_BUDGET
 
-Submit a budget allocation request for the agent's own department.
+Submit a **discretionary** budget request for the agent's own department: additional funding **above** the auto-funded critical floor `Critical_d`.
 
 **Parameters**:
 - `department` (string): Must match the agent's assigned portfolio
-- `amount` (number): Requested allocation, must be within valid range
+- `amount` (number): **Discretionary** amount ≥ 0 (extra above auto-critical; **0** = critical only)
 - `justification` (string): Narrative explaining the request
 
 **Constraints**:
 - `amount` must be >= 0
-- `amount` must be <= current treasury balance at submission time
+- `amount` must be <= **discretionary headroom** at submission time: `Treasury - sum(Critical_d)` (same validation as “remaining after mandatory critical”)
 - `amount` must be a numeric value (no strings, nulls, or NaN)
 - `department` must be the agent's own assigned department
 - One proposal per agent per round (first submission honored, subsequent ignored)
+- **Required every round** — there is no separate abstention action
 
 **Timing**: Phase 3 (Budget Proposal Phase) only
 
 **Valid Examples**:
-- `{department: "Health", amount: 300, justification: "Medical supplies"}`
-- `{department: "Defense", amount: 0, justification: "No needs this round"}`
+- `{department: "Health", amount: 20, justification: "Medical supplies above baseline"}`
+- `{department: "Defense", amount: 0, justification: "Critical only this quarter"}`
 
 **Invalid Examples**:
 - `{department: "Health", amount: -50, justification: "..."}` — negative amount
-- `{department: "Health", amount: 50000, justification: "..."}` — exceeds treasury
+- `{department: "Health", amount: 50000, justification: "..."}` — exceeds discretionary headroom
 - `{department: "Defense", amount: 100, justification: "..."}` — wrong department for agent
 
 **Outcome**:
 - Valid proposal: publicly announced, enters voting queue
-- Invalid proposal: rejected, agent must resubmit valid amount or abstain
+- Invalid proposal: rejected; agent must resubmit a valid proposal before the phase can complete
 
 ---
 
@@ -97,36 +98,13 @@ Send a public message visible to all agents during discussion phase.
 
 ---
 
-### 4. ABSTAIN_FROM_PROPOSAL
-
-Explicitly skip the agent's turn in the budget proposal phase.
-
-**Parameters**: None required (action is the absence of PROPOSE_BUDGET)
-
-**Constraints**:
-- Can only abstain during Phase 3 when it is the agent's turn
-- Abstention is explicit (agent must signal intent, not passive default)
-
-**Timing**: Phase 3 (Budget Proposal Phase) only
-
-**Effect**:
-- Agent submits no proposal for their department
-- Department receives zero allocation for this round
-- Treated as rejected proposal (no treasury change)
-
-**Invalid Examples**:
-- Abstaining outside Phase 3 — ignored
-- Abstaining when it is not the agent's turn — ignored
-
----
-
 ## Phase-Action Mapping
 
 | Phase | Available Actions |
 |-------|-------------------|
 | Phase 1: Event Revelation | None (observation only) |
 | Phase 2: Debate/Discussion | DEBATE |
-| Phase 3: Budget Proposal | PROPOSE_BUDGET, ABSTAIN_FROM_PROPOSAL |
+| Phase 3: Budget Proposal | PROPOSE_BUDGET |
 | Phase 4: Voting | VOTE |
 | Phase 5: Budget Execution | None (system executes) |
 | Phase 6: Consumption & Event Impact | None (system executes) |
@@ -145,7 +123,7 @@ Explicitly skip the agent's turn in the budget proposal phase.
 **Handling**: Proposal is REJECTED.
 
 - Agent receives error feedback indicating invalid amount
-- Agent may resubmit valid proposal or abstain
+- Agent must resubmit a valid proposal
 - No treasury change occurs
 
 **Examples**:
@@ -161,7 +139,7 @@ Explicitly skip the agent's turn in the budget proposal phase.
 
 **Handling**: Proposal is REJECTED.
 
-- Agent may resubmit with correct department or abstain
+- Agent may resubmit with correct department
 
 ---
 
@@ -209,7 +187,7 @@ Explicitly skip the agent's turn in the budget proposal phase.
 
 **Handling**: Proposal is REJECTED.
 
-- Agent may resubmit with valid numeric amount or abstain
+- Agent may resubmit with valid numeric amount
 
 ---
 
@@ -222,7 +200,7 @@ Agent State: IDLE
 Phase 2: Can perform DEBATE
   |
   v
-Phase 3: Can perform PROPOSE_BUDGET or ABSTAIN_FROM_PROPOSAL
+Phase 3: Can perform PROPOSE_BUDGET (required once per minister)
   |
   v
 Phase 4: Can perform VOTE on each proposal in queue
@@ -237,10 +215,9 @@ Phase 5+: No actions available (system-driven phases)
 
 | Action | Parameters | Phase | Constraint |
 |--------|------------|-------|------------|
-| PROPOSE_BUDGET | department, amount, justification | Phase 3 | 0 <= amount <= treasury |
+| PROPOSE_BUDGET | department, amount, justification | Phase 3 | 0 <= amount <= discretionary headroom |
 | VOTE | proposal_id, vote | Phase 4 | proposal must exist |
 | DEBATE | message | Phase 2 | none |
-| ABSTAIN_FROM_PROPOSAL | none | Phase 3 | must be agent's turn |
 
 ---
 
@@ -249,7 +226,7 @@ Phase 5+: No actions available (system-driven phases)
 ### Agent Submits Invalid Proposal Multiple Times
 
 - First invalid submission: rejected with error
-- Subsequent submissions: also rejected until valid or abstain
+- Subsequent submissions: also rejected until valid
 
 ### Agent Attempts Action During System Phase
 
