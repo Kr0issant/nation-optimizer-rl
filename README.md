@@ -18,7 +18,7 @@ pinned: false
 
 ### 🔗 Submission Quick-Links
 *   **🚀 Hugging Face Space**: [Nation Optimizer](https://huggingface.co/spaces/ascentftw/nation_optimizer)
-*   **📓 Training Notebook**: [Open in Colab (training.ipynb)](https://colab.research.google.com/github/Kr0issant/communism-optimizer-rl/blob/main/training.ipynb)
+*   **📓 Training Notebook**: [Open in Colab (`notebooks/colab_grpo_training.ipynb`)](https://colab.research.google.com/github/Kr0issant/communism-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb) — use GitHub org **`Kr0issant`** (with **two s** in the middle) or, if the repo was renamed, [`nation-optimizer-rl`](https://colab.research.google.com/github/Kr0issant/nation-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb)
 *   **📊 Training Evidence**: [Reward & Loss Curves](assets/results/)
 *   **📽️ Project Presentation**: [YouTube Video / Blog Post Placeholder](https://huggingface.co/blog/your-username/nation-optimizer)
 
