@@ -17,15 +17,15 @@ the training curve directly.
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "trl>=0.20",
-#     "peft>=0.12",
-#     "datasets>=2.20",
-#     "transformers>=4.44",
-#     "trackio>=0.1",
-#     "accelerate>=0.34",
-#     "bitsandbytes>=0.43",
-#     "huggingface-hub>=1.12",
-#     "pydantic>=2.13",
+#     "trl>=0.12.0",
+#     "peft>=0.12.0",
+#     "datasets>=2.20.0",
+#     "transformers>=4.44.0",
+#     "trackio>=0.1.0",
+#     "accelerate>=0.34.0",
+#     "bitsandbytes>=0.43.0",
+#     "huggingface-hub>=0.24.0",
+#     "pydantic>=2.8.0",
 # ]
 # ///
 
