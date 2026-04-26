@@ -101,11 +101,15 @@ def safe_fallback_action(observation: Observation, valid_actions: set[str]) -> A
             else "Unknown"
         )
         n_depts = max(len(observation.proposals), 6)
-        share = max(observation.treasury / n_depts, 1.0)
+        tr = float(observation.treasury)
+        total_c = float(getattr(observation, "total_critical", 0) or 0)
+        pool = max(0.0, tr - total_c)
+        share = max(tr / n_depts, 1.0)
+        amount = min(share, pool)
         return ProposeBudgetAction(
             type=ActionType.PROPOSE_BUDGET,
             department=dept_name,
-            amount=share,
+            amount=amount,
             justification=SAFE_FALLBACK_JUSTIFICATION,
         )
 

@@ -15,13 +15,22 @@ class LLMProposeBudgetAction(BaseModel):
     """Schema for proposing a budget."""
     type: Literal["PROPOSE_BUDGET"] = Field(description="The action type. Must be 'PROPOSE_BUDGET'.")
     department: str = Field(description="Your department name.")
-    amount: float = Field(description="The amount of funds requested from the treasury.")
+    amount: float = Field(
+        description=(
+            "Discretionary additional funding (≥ 0) on top of your auto-funded critical floor. "
+            "0 means you need only the automatic minimum this round."
+        )
+    )
     justification: str = Field(description="A public justification for the requested amount.")
 
 class LLMVoteAction(BaseModel):
     """Schema for casting a vote on the current budget proposal."""
     type: Literal["VOTE"] = Field(description="The action type. Must be 'VOTE'.")
     vote: Literal["YES", "NO", "ABSTAIN"] = Field(description="Your vote choice.")
+    proposal_id: str | None = Field(
+        default=None,
+        description="Proposal id (filled by the environment or included in training/eval JSON).",
+    )
 
 class LLMFinishDebateAction(BaseModel):
     """Schema for ending the debate phase early."""

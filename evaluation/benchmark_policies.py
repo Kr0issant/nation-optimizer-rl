@@ -221,6 +221,8 @@ def _observation_for_agent(state: dict[str, Any], agent_id: str) -> Observation:
             surplus=sector.get("surplus"),
             efficiency_rating=sector.get("revenue_factor"),
             treasury_surplus_returned_this_round=state.get("last_total_surplus"),
+            critical=float(sector.get("critical", 0.0) or 0.0),
+            demand=float(sector.get("demand", 0.0) or 0.0),
         ),
         event_ledger=tuple(state["event_ledger"]),
         proposals=tuple(
@@ -244,6 +246,8 @@ def _observation_for_agent(state: dict[str, Any], agent_id: str) -> Observation:
         ),
         debate_messages=tuple(state["debate_messages"]),
         termination=state["termination"],
+        total_critical=float(state.get("total_critical", 0.0) or 0.0),
+        max_rounds=int(state.get("max_rounds", 0) or 0),
     )
 
 

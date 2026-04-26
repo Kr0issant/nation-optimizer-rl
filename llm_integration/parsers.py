@@ -65,7 +65,9 @@ def parse_action_json(payload: str | dict[str, Any], target_proposal_id: str | N
         )
 
     elif action_type == "VOTE":
-        final_id = target_proposal_id
+        final_id = target_proposal_id or getattr(
+            parsed_llm_action, "proposal_id", None
+        ) or str(data.get("proposal_id", "") or "")
         if not final_id:
             raise ActionParseError("VOTE action generated but no target_proposal_id was provided by the environment.")
             

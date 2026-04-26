@@ -1,11 +1,11 @@
-"""Greedy baseline: each minister maximizes its own departmental request."""
+"""Greedy baseline: each minister requests the full discretionary pool."""
 
 from collections.abc import Iterable
 
 from agents.base import PolicyAdapter
+from agents.rule_based.discretionary import discretionary_pool
 from agents.rule_based.voting import first_vote_target
 from schemas.actions import (
-    AbstainProposalAction,
     Action,
     ActionType,
     DebateAction,
@@ -28,8 +28,8 @@ class GreedyAdapter(PolicyAdapter):
             return ProposeBudgetAction(
                 type=ActionType.PROPOSE_BUDGET,
                 department=observation.own_department.name,
-                amount=observation.treasury,
-                justification="Maximize this department's immediate allocation.",
+                amount=discretionary_pool(observation),
+                justification="Maximize this department's immediate discretionary ask.",
             )
 
         vote_target = first_vote_target(observation.proposals, agent_id)
@@ -46,4 +46,7 @@ class GreedyAdapter(PolicyAdapter):
                 message=f"{agent_id} requests priority for {observation.own_department.name}.",
             )
 
-        return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
+        return DebateAction(
+            type=ActionType.DEBATE,
+            message=f"{agent_id} (greedy) idle.",
+        )

@@ -10,10 +10,10 @@ so the per-row context (treasury, own sector thresholds, proposals, valid
 actions) is passed through unchanged from
 :mod:`scripts.collect_grpo_prompts`.
 
-Scoring is dense and grounded in the engine's piecewise revenue curve from
-:mod:`core.revenue` so the reward signal is in lockstep with the simulator the
-trained adapter will be evaluated against. There is no ``DEBATE`` branch —
-debate is inference only and never enters the GRPO dataset.
+Proposals are **discretionary** above auto-funded critical minimums (see
+`specification/proposed-amendments` Option A). Scoring is dense and grounded in
+:mod:`core.revenue` so the signal matches the simulator. There is no
+``DEBATE`` branch — debate is inference only and never enters the GRPO dataset.
 """
 
 from __future__ import annotations
@@ -21,12 +21,13 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
+from core.config import WASTAGE_RATIO
 from core.revenue import revenue_factor as _revenue_factor
 from llm_integration.parsers import ActionParseError, parse_action_json
 from schemas.actions import (
-    AbstainProposalAction,
-    Action,
     ActionType,
+    DebateAction,
+    FinishDebateAction,
     ProposeBudgetAction,
     VoteAction,
     VoteChoice,
@@ -34,24 +35,30 @@ from schemas.actions import (
 
 PARSE_FAIL_REWARD = -1.0
 ILLEGAL_ACTION_REWARD = -0.5
-ABSTAIN_REWARD = 0.0
+VOTE_NEUTRAL_REWARD = 0.0
 PROPOSE_BASE_REWARD = 0.2
 PROPOSE_FACTOR_WEIGHT = 0.9
+VOTE_YES_WEIGHT = 1.0
+VOTE_NO_WEIGHT = 0.5
+SURVIVAL_SHAPING_WEIGHT = 0.0
+
+
+def _total_critical_from_row(row: Mapping[str, Any]) -> float:
+    v = row.get("total_critical")
+    if v is not None and str(v) != "":
+        return max(0.0, _safe_float(v, default=0.0))
+    sectors = row.get("all_sectors")
+    if not isinstance(sectors, Mapping):
+        return 0.0
+    s = 0.0
+    for data in sectors.values():
+        if isinstance(data, Mapping) and "critical" in data:
+            s += float(data["critical"])
+    return s
 
 
 def make_reward_fn() -> Callable[..., list[float]]:
-    """Build the GRPO-compatible reward callable for parliamentary completions.
-
-    Each call receives one prompt/completion pair plus per-row metadata through
-    ``kwargs``. The returned scalar is a dense reward in roughly ``[-1.0, +1.4]``
-    based on:
-
-    1. JSON parses against :func:`parse_action_json`.
-    2. Action type is in the per-row ``valid_actions`` list (legality check).
-    3. Departmental and treasury constraints are satisfied (for proposals).
-    4. The piecewise revenue factor of the proposed allocation, or of the
-       proposal being voted on, taken from :func:`core.revenue.revenue_factor`.
-    """
+    """Build the GRPO-compatible reward callable for parliamentary completions."""
 
     def reward(
         prompts: Sequence[str],
@@ -79,12 +86,19 @@ def _score_one(completion: str, row: Mapping[str, Any]) -> float:
         return ILLEGAL_ACTION_REWARD
 
     if isinstance(action, ProposeBudgetAction):
-        return _score_propose_budget(action, row)
-    if isinstance(action, VoteAction):
-        return _score_vote(action, row)
-    if isinstance(action, AbstainProposalAction):
-        return ABSTAIN_REWARD
-    return ABSTAIN_REWARD
+        base = _score_propose_budget(action, row)
+    elif isinstance(action, VoteAction):
+        base = _score_vote(action, row)
+    elif isinstance(action, (DebateAction, FinishDebateAction)):
+        return VOTE_NEUTRAL_REWARD if action.type.value in valid_actions else ILLEGAL_ACTION_REWARD
+    else:
+        return ILLEGAL_ACTION_REWARD
+
+    mr = int(row.get("max_rounds") or 0)
+    r = int(row.get("round") or 0)
+    if mr > 0 and SURVIVAL_SHAPING_WEIGHT:
+        base += SURVIVAL_SHAPING_WEIGHT * (r / float(mr))
+    return base
 
 
 def _score_propose_budget(action: ProposeBudgetAction, row: Mapping[str, Any]) -> float:
@@ -93,11 +107,14 @@ def _score_propose_budget(action: ProposeBudgetAction, row: Mapping[str, Any]) -
         return ILLEGAL_ACTION_REWARD
 
     treasury = _safe_float(row.get("treasury"), default=0.0)
-    if not 0.0 <= float(action.amount) <= treasury:
+    total_c = _total_critical_from_row(row)
+    if not 0.0 <= float(action.amount) <= max(0.0, treasury - total_c):
         return ILLEGAL_ACTION_REWARD
 
     own_sector = _coerce_sector(row.get("own_sector"))
-    rf = _piecewise_revenue_factor_for_amount(action.amount, own_sector)
+    c = _safe_float(own_sector.get("critical"), default=0.0)
+    total_alloc = c + float(action.amount)
+    rf = _piecewise_revenue_factor_for_amount(total_alloc, own_sector)
     return PROPOSE_BASE_REWARD + PROPOSE_FACTOR_WEIGHT * (rf - 1.0)
 
 
@@ -115,16 +132,16 @@ def _score_vote(action: VoteAction, row: Mapping[str, Any]) -> float:
     if target is None:
         return ILLEGAL_ACTION_REWARD
 
-    rf = _piecewise_revenue_factor_for_amount(
-        _safe_float(proposal.get("amount"), default=0.0),
-        target,
-    )
+    c = _safe_float(target.get("critical"), default=0.0)
+    disc = _safe_float(proposal.get("amount"), default=0.0)
+    total_alloc = c + disc
+    rf = _piecewise_revenue_factor_for_amount(total_alloc, target)
 
     if action.vote is VoteChoice.YES:
-        return rf - 1.0
+        return VOTE_YES_WEIGHT * (rf - 1.0)
     if action.vote is VoteChoice.NO:
-        return -(rf - 1.0)
-    return ABSTAIN_REWARD
+        return VOTE_NO_WEIGHT * (-(rf - 1.0))
+    return VOTE_NEUTRAL_REWARD
 
 
 def _piecewise_revenue_factor_for_amount(
@@ -135,8 +152,7 @@ def _piecewise_revenue_factor_for_amount(
     critical = float(sector["critical"])
     demand = float(sector["demand"])
     surplus = float(sector["surplus"])
-    # Match core.config.WASTAGE_RATIO = 2.5
-    wastage = demand * 2.5
+    wastage = float(sector["wastage"]) if "wastage" in sector else demand * WASTAGE_RATIO
     rf = _revenue_factor(
         allocation=float(amount),
         critical=critical,
@@ -155,7 +171,7 @@ def _coerce_sector(value: Any) -> Mapping[str, float]:
     for required in ("critical", "demand", "surplus"):
         if required not in value:
             raise KeyError(f"'own_sector' is missing required key {required!r}.")
-    return value
+    return value  # "wastage" optional; RF uses demand*WASTAGE_RATIO if absent
 
 
 def _coerce_sector_map(value: Any) -> dict[str, Mapping[str, float]]:
@@ -220,10 +236,13 @@ def _safe_float(value: Any, *, default: float = 0.0) -> float:
 
 
 __all__ = [
-    "ABSTAIN_REWARD",
     "ILLEGAL_ACTION_REWARD",
     "PARSE_FAIL_REWARD",
     "PROPOSE_BASE_REWARD",
     "PROPOSE_FACTOR_WEIGHT",
+    "SURVIVAL_SHAPING_WEIGHT",
+    "VOTE_NEUTRAL_REWARD",
+    "VOTE_NO_WEIGHT",
+    "VOTE_YES_WEIGHT",
     "make_reward_fn",
 ]

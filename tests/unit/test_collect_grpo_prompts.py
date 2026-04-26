@@ -56,7 +56,13 @@ def test_collected_prompt_matches_render_minister_prompt_exactly() -> None:
         round=1,
         phase=Phase.PROPOSAL,
         treasury=1500.0,
-        own_department=OwnDepartmentObservation(name="Health"),
+        own_department=OwnDepartmentObservation(
+            name="Health",
+            critical=36.0,
+            demand=90.0,
+        ),
+        total_critical=200.0,
+        max_rounds=12,
         proposals=(
             ProposalObservation(
                 proposal_id="p-1",
@@ -68,7 +74,7 @@ def test_collected_prompt_matches_render_minister_prompt_exactly() -> None:
             ),
         ),
     )
-    valid_actions = {"PROPOSE_BUDGET", "ABSTAIN_FROM_PROPOSAL"}
+    valid_actions = {"PROPOSE_BUDGET"}
     expected_prompt = render_minister_prompt(observation, "Health", valid_actions)
 
     assert "Minister for the 'Health' department" in expected_prompt
@@ -100,7 +106,9 @@ def test_build_sector_thresholds_returns_public_fields_only() -> None:
         }
     }
     thresholds = build_sector_thresholds(state)
-    assert thresholds == {"Health": {"critical": 36.8, "demand": 92.0, "surplus": 138.0}}
+    assert thresholds == {
+        "Health": {"critical": 36.8, "demand": 92.0, "surplus": 138.0, "wastage": 184.0}
+    }
 
 
 def test_write_jsonl_is_round_trippable(tmp_path: Path) -> None:

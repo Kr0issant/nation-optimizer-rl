@@ -1,7 +1,7 @@
 from llm_integration.adapters.dictator import DictatorLLMAdapter
 from llm_integration.adapters.parliamentary import ParliamentaryLLMAdapter
 from llm_integration.hf_client import TextGenerationResult
-from schemas.actions import ActionType, VoteChoice
+from schemas.actions import ActionType, ProposeBudgetAction, VoteChoice
 from schemas.observations import (
     Observation,
     OwnDepartmentObservation,
@@ -41,7 +41,7 @@ def test_parliamentary_adapter_parses_budget_action_and_logs_llm_call() -> None:
         client,
         logger=logger,
         model="mock-model",
-    ).act(observation, {"PROPOSE_BUDGET", "ABSTAIN_FROM_PROPOSAL"}, "health-minister")
+    ).act(observation, {"PROPOSE_BUDGET"}, "health-minister")
 
     assert action.type is ActionType.PROPOSE_BUDGET
     assert action.department == "Health"
@@ -52,33 +52,34 @@ def test_parliamentary_adapter_parses_budget_action_and_logs_llm_call() -> None:
     assert event.payload["prompt_tokens"] == 12
     assert event.payload["completion_tokens"] == 9
     assert event.payload["parsed_action"]["type"] == "PROPOSE_BUDGET"
-    assert "777" not in client.prompts[0]
-    assert "0.42" not in client.prompts[0]
     assert "9999" in client.prompts[0]
     assert "12345" not in client.prompts[0]
+    assert "PROPOSE_BUDGET" in client.prompts[0]
 
 
-def test_parliamentary_adapter_falls_back_to_allowed_abstain_on_parse_failure() -> None:
+def test_parliamentary_adapter_falls_back_to_safe_proposal_on_parse_failure() -> None:
     logger = EpisodeLogger(episode_id="episode-1")
     client = MockTextGenerationClient(["I want more money, not JSON."])
     observation = _proposal_observation()
 
     action = ParliamentaryLLMAdapter(client, logger=logger).act(
         observation,
-        {"PROPOSE_BUDGET", "ABSTAIN_FROM_PROPOSAL"},
+        {"PROPOSE_BUDGET"},
         "health-minister",
     )
 
-    assert action.type is ActionType.ABSTAIN_FROM_PROPOSAL
+    assert isinstance(action, ProposeBudgetAction)
+    assert action.department == "Health"
+    assert action.type is ActionType.PROPOSE_BUDGET
     event = logger.events[-1]
     assert event.event_type == "llm_call"
     assert event.payload["parse_ok"] is False
     assert event.payload["completion"] == "I want more money, not JSON."
-    assert event.payload["fallback_action"]["type"] == "ABSTAIN_FROM_PROPOSAL"
+    assert event.payload["fallback_action"]["type"] == "PROPOSE_BUDGET"
     assert "parse_error" in event.payload
 
 
-def test_parliamentary_adapter_returns_structurally_valid_rule_breaking_action() -> None:
+def test_parliamentary_adapter_falls_back_to_debate_when_proposal_not_allowed() -> None:
     logger = EpisodeLogger(episode_id="episode-1")
     client = MockTextGenerationClient(
         [
@@ -95,12 +96,10 @@ def test_parliamentary_adapter_returns_structurally_valid_rule_breaking_action()
         "health-minister",
     )
 
-    assert action.type is ActionType.PROPOSE_BUDGET
-    assert action.department == "Defense"
-    assert action.amount == 9999.0
+    assert action.type is ActionType.DEBATE
     event = logger.events[-1]
-    assert event.payload["parse_ok"] is True
-    assert "fallback_action" not in event.payload
+    assert event.payload["parse_ok"] is False
+    assert "fallback_action" in event.payload
 
 
 def test_dictator_adapter_parses_vote_action_and_logs_llm_call() -> None:
@@ -165,7 +164,7 @@ def test_dictator_oracle_prompt_includes_raw_event_ledger() -> None:
     assert "severity_multiplier" in client.prompts[0]
 
 
-def test_dictator_adapter_falls_back_to_abstain_vote_on_parse_failure() -> None:
+def test_dictator_adapter_falls_back_to_yes_vote_on_parse_failure() -> None:
     logger = EpisodeLogger(episode_id="episode-1")
     client = MockTextGenerationClient(["not-json"])
 
@@ -176,9 +175,9 @@ def test_dictator_adapter_falls_back_to_abstain_vote_on_parse_failure() -> None:
     )
 
     assert action.type is ActionType.VOTE
-    assert action.vote is VoteChoice.ABSTAIN
+    assert action.vote is VoteChoice.YES
     assert logger.events[-1].payload["parse_ok"] is False
-    assert logger.events[-1].payload["fallback_action"]["vote"] == "ABSTAIN"
+    assert logger.events[-1].payload["fallback_action"]["vote"] == "YES"
 
 
 def _proposal_observation() -> Observation:

@@ -119,10 +119,6 @@ class ParliamentRoundState:
                 amount=data.get("amount"),
                 justification=str(data.get("justification", "")),
             )
-        if Phase(phase) == Phase.PROPOSAL and action_type == ActionType.ABSTAIN_FROM_PROPOSAL.value:
-            return self.submit_abstention(
-                agent_id=str(data.get("agent_id") or data.get("agent") or ""),
-            )
         if Phase(phase) == Phase.VOTING and action_type == ActionType.VOTE.value:
             return self.submit_vote(
                 agent_id=str(data.get("agent_id") or data.get("agent") or ""),

@@ -366,15 +366,3 @@ def test_collect_actions_over_phases_and_resolve_to_allocations():
     assert isinstance(state.votes[0], VoteRecord)
 
 
-def test_collect_action_routes_abstain_from_proposal():
-    state = make_state()
-
-    abstention = state.collect_action(
-        Phase.PROPOSAL,
-        {"type": ActionType.ABSTAIN_FROM_PROPOSAL, "agent_id": "health-minister"},
-    )
-
-    assert isinstance(abstention, ProposalAbstention)
-    assert abstention.agent_id == "health-minister"
-    assert abstention.department == "Health"
-    assert state.proposal_abstentions == [abstention]

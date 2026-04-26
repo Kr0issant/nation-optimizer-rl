@@ -44,9 +44,9 @@ def test_invalid_amount_is_rejected() -> None:
 
 
 def test_phase_action_mapping_matches_spec() -> None:
-    assert valid_action_types_for_phase(Phase.DEBATE) == frozenset({"DEBATE"})
-    assert valid_action_types_for_phase(Phase.PROPOSAL) == frozenset(
-        {"PROPOSE_BUDGET", "ABSTAIN_FROM_PROPOSAL"}
+    assert valid_action_types_for_phase(Phase.DEBATE) == frozenset(
+        {"DEBATE", "FINISH_DEBATE"}
     )
+    assert valid_action_types_for_phase(Phase.PROPOSAL) == frozenset({"PROPOSE_BUDGET"})
     assert valid_action_types_for_phase(Phase.VOTING) == frozenset({"VOTE"})
     assert ActionType.DEBATE.value in valid_action_types_for_phase(Phase.DEBATE)

@@ -1,8 +1,12 @@
-"""Profit-zone heuristic baseline."""
+"""Profit-zone heuristic baseline (discretionary ask above critical)."""
 
 from collections.abc import Iterable
 
 from agents.rule_based.conservative import ConservativeAdapter
+from agents.rule_based.discretionary import (
+    discretionary_for_target_total,
+    discretionary_pool,
+)
 from schemas.actions import Action, ActionType, ProposeBudgetAction
 from schemas.departments import BASELINES_BY_DEPARTMENT
 from schemas.observations import Observation
@@ -22,10 +26,15 @@ class OptimalZoneAdapter(ConservativeAdapter):
             return super().act(observation, valid_actions, agent_id)
 
         baseline = BASELINES_BY_DEPARTMENT[observation.own_department.name]
-        target_amount = baseline * OPTIMAL_ZONE_MULTIPLIER
+        c = float(observation.own_department.critical)
+        target_total = baseline * OPTIMAL_ZONE_MULTIPLIER
+        pool = discretionary_pool(observation)
+        d = discretionary_for_target_total(
+            want_total=target_total, own_critical=c, pool=pool
+        )
         return ProposeBudgetAction(
             type=ActionType.PROPOSE_BUDGET,
             department=observation.own_department.name,
-            amount=min(target_amount, observation.treasury),
+            amount=d,
             justification="Target the profit zone above demand without entering wastage.",
         )

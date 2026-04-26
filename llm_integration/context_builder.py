@@ -26,7 +26,7 @@ HIDDEN_EVENT_FIELDS = frozenset(
     }
 )
 
-PUBLIC_SECTOR_FIELDS = ("critical", "demand", "surplus")
+PUBLIC_SECTOR_FIELDS = ("critical", "demand", "surplus", "wastage")
 
 def build_public_observation(observation: Any) -> dict[str, Any]:
     """Builds a public-facing observation for ministers."""
@@ -50,6 +50,8 @@ def build_public_observation(observation: Any) -> dict[str, Any]:
         "round": observation.round,
         "phase": phase_str,
         "treasury": observation.treasury,
+        "total_critical": getattr(observation, "total_critical", 0.0),
+        "max_rounds": getattr(observation, "max_rounds", 0),
         "event_ledger": [_sanitize_event(event) for event in observation.event_ledger],
         "proposals": visible_proposals,
         "votes": [_to_dict(v) for v in observation.votes],

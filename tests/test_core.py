@@ -335,27 +335,24 @@ def test_spec_example_2_surplus_zone():
     print(f"    (Spec's 1670 doesn't include Phase 8 surplus return of {total_surplus})")
 
 
-def test_spec_example_3_critical_failure():
-    """Spec 04 Example 3: Defense at 30% demand → CRITICAL FAILURE"""
-    print("\n  Running Spec Example 3 (Critical failure)...")
+def test_spec_example_3_auto_critical_prevents_sudden_death():
+    """Direct allocation: low requested totals still get auto-funded critical (Option A)."""
+    print("\n  Running Spec Example 3 (auto-critical, no under-critical death)...")
 
     cfg = GameConfig.from_json()
     game = NationGame(config=cfg, seed=0)
     game.reset()
 
-    # Allocate everything normally except Defense at 30 (below critical=40)
     alloc = {
         "Social": 60, "Agriculture": 70, "Health": 90,
         "Education": 80, "Defense": 30, "Commerce": 75,
     }
 
     result = game.step(alloc)
-    assert result.done is True, "Should be done"
-    assert result.termination_reason == "CRITICAL_FAILURE", \
-        f"Expected CRITICAL_FAILURE, got {result.termination_reason}"
-    assert result.reward.critical_penalty == -1000, \
-        f"Expected -1000 penalty, got {result.reward.critical_penalty}"
-    print(f"  ✓ Critical failure triggered, penalty = {result.reward.critical_penalty}")
+    assert result.done is False, "Should survive: defense gets at least critical + discretionary"
+    assert result.termination_reason != "CRITICAL_FAILURE"
+    assert result.total_revenue is not None
+    print("  ✓ Low ask maps to auto-critical + disc; round completes without critical termination")
 
 
 def test_full_episode_optimal():
@@ -389,7 +386,7 @@ def test_full_episode_optimal():
 
 
 def test_shutdown():
-    """2 consecutive zero-allocation rounds → SHUTDOWN."""
+    """2 consecutive zero-discretionary rounds → SHUTDOWN (auto-critical still applies)."""
     print("\n  Running shutdown test...")
 
     cfg = GameConfig.from_json()
@@ -398,12 +395,13 @@ def test_shutdown():
 
     zero_alloc = {name: 0.0 for name in cfg.SECTOR_BASELINES}
 
-    # Round 1 zero alloc — should trigger critical failure because 0 < critical
-    result = game.step(zero_alloc)
-    assert result.done is True
-    assert result.termination_reason == "CRITICAL_FAILURE", \
-        f"Expected CRITICAL_FAILURE (0 < critical), got {result.termination_reason}"
-    print("  ✓ Zero allocation triggers critical failure (0 < critical threshold)")
+    r1 = game.step(zero_alloc)
+    assert not r1.done
+    assert r1.termination_reason != "CRITICAL_FAILURE"
+    r2 = game.step(zero_alloc)
+    assert r2.done
+    assert r2.termination_reason == "SHUTDOWN"
+    print("  ✓ Two rounds with no discretionary ask → shutdown (critical auto-funded).")
 
 
 def test_time_display():
@@ -484,7 +482,7 @@ def main():
     print("\n── Game Integration Tests ──")
     test_spec_example_1_normal_at_demand()
     test_spec_example_2_surplus_zone()
-    test_spec_example_3_critical_failure()
+    test_spec_example_3_auto_critical_prevents_sudden_death()
     test_time_display()
     test_shutdown()
     test_full_episode_optimal()

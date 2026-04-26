@@ -34,7 +34,11 @@ TERMINATION_PROSPERITY = "PROSPERITY_THRESHOLD"
 
 @dataclass
 class Proposal:
-    """Public budget proposal submitted during phase 3."""
+    """Public budget proposal submitted during phase 3.
+
+    ``amount`` is **discretionary** funding (above the auto-funded critical
+    floor). Total spend if approved = ``critical(department) + amount``.
+    """
 
     proposal_id: str
     agent_id: str
@@ -198,6 +202,7 @@ class NationGame:
         self.last_total_revenue = 0.0
         self.last_total_surplus = 0.0
         self.last_total_allocation = 0.0
+        self.last_total_discretionary = 0.0
         self.current_round_crisis = False
         self.current_events: list[Event] = []
         self.event_ledger: list[dict[str, Any]] = []
@@ -249,6 +254,8 @@ class NationGame:
             "phase_name": self.phase.name,
             "year": year,
             "quarter": quarter,
+            "max_rounds": int(self.config.MAX_ROUNDS),
+            "total_critical": round(self._total_critical_funding(), 6),
             "treasury": round(self.treasury.balance, 6),
             "population": self.population.value,
             "productivity": round(self.productivity.value, 6),
@@ -405,8 +412,11 @@ class NationGame:
     def _run_current_system_phase(self, info: dict[str, Any]) -> None:
         if self.phase == Phase.BUDGET_EXECUTION:
             self._tally_votes()
-            critical_failed = self._execute_approved_budgets()
-            if critical_failed:
+            budget_status = self._execute_approved_budgets()
+            if budget_status == "bankruptcy":
+                self._finish_round(budget_bankruptcy=True, terminate_immediately=True)
+                info["termination_reason"] = self.termination_reason
+            elif budget_status == "critical_invariant":
                 self._finish_round(critical_failed=True, terminate_immediately=True)
                 info["termination_reason"] = self.termination_reason
         elif self.phase == Phase.CONSUMPTION_AND_EVENT_IMPACT and not self.done:
@@ -429,27 +439,56 @@ class NationGame:
         for proposal in self.proposals:
             proposal.status = PROPOSAL_STATUS_REJECTED
         self.proposals = []
+        total_c = self._total_critical_funding()
+        if self.treasury.balance < total_c:
+            self.last_total_discretionary = 0.0
+            self._finish_round(
+                budget_bankruptcy=True, terminate_immediately=False, completed_round=self.round
+            )
+            info = {
+                "accepted_actions": [{"type": "DIRECT_ALLOCATION"}],
+                "ignored_actions": [],
+                "rejected_actions": [],
+                "termination_reason": self.termination_reason,
+            }
+            self.last_info = info
+            return self._result(info, completed_round=self.round)
+
+        pop = self.population.value
+        for sector in self.sectors.values():
+            sector.allocate(0.0)
+        for sector in self.sectors.values():
+            sector.allocate(float(sector.critical(pop)))
+        self.treasury.debit(total_c)
+
+        remaining = self.treasury.balance
+        disc_sum = 0.0
         for department in self.config.SECTOR_ORDER:
-            amount = float(allocations.get(department, 0.0))
-            proposal = self._new_proposal(
+            sector = self.sectors[department]
+            c = float(sector.critical(pop))
+            requested_total = max(0.0, float(allocations.get(department, 0.0)))
+            want_disc = max(0.0, requested_total - c)
+            disc = min(want_disc, max(0.0, remaining))
+            sector.allocate(c + disc)
+            self.treasury.debit(disc)
+            remaining = self.treasury.balance
+            disc_sum += disc
+            self._new_proposal(
                 agent_id=department,
                 department=department,
-                amount=amount,
+                amount=disc,
                 status=PROPOSAL_STATUS_APPROVED,
             )
-            self.sectors[department].allocate(proposal.amount)
 
-        critical_failed = any(sector.is_critical_failure(self.population.value) for sector in self.sectors.values())
-        if not critical_failed:
-            self.last_total_allocation = sum(sector.allocation for sector in self.sectors.values())
-            self.treasury.balance -= self.last_total_allocation
-            self._compute_consumption()
-            self._compute_revenue()
-            self.treasury.credit(self.last_total_revenue)
-            self.treasury.credit(self.last_total_surplus)
-            self.treasury.apply_baseline_tax()
+        self.last_total_discretionary = disc_sum
+        self.last_total_allocation = total_c + disc_sum
+        self._compute_consumption()
+        self._compute_revenue()
+        self.treasury.credit(self.last_total_revenue)
+        self.treasury.credit(self.last_total_surplus)
+        self.treasury.apply_baseline_tax()
 
-        self._finish_round(critical_failed=critical_failed, completed_round=self.round)
+        self._finish_round(critical_failed=False, completed_round=self.round)
         info = {
             "accepted_actions": [{"type": "DIRECT_ALLOCATION"}],
             "ignored_actions": [],
@@ -463,48 +502,58 @@ class NationGame:
             self._start_round()
         return self._result(info, completed_round=self.round - 1 if not self.done else self.round)
 
-    def _execute_approved_budgets(self) -> bool:
+    def _total_critical_funding(self) -> float:
+        """Total critical minimum spend for all sectors this round (population-based)."""
+        pop = self.population.value
+        return sum(s.critical(pop) for s in self.sectors.values())
+
+    def _execute_approved_budgets(self) -> str:
+        """Set allocations from auto-funded critical + approved discretionary. Returns status."""
+        self.last_total_discretionary = 0.0
+        total_c = self._total_critical_funding()
+        if self.treasury.balance < total_c:
+            self.last_total_allocation = 0.0
+            return "bankruptcy"
+
+        pop = self.population.value
         for sector in self.sectors.values():
             sector.allocate(0.0)
-
-        for proposal in self.proposals:
-            if proposal.status == PROPOSAL_STATUS_APPROVED:
-                self.sectors[proposal.department].allocate(
-                    self.sectors[proposal.department].allocation + proposal.amount
-                )
-
-        approved_departments = {
-            proposal.department
-            for proposal in self.proposals
-            if proposal.status == PROPOSAL_STATUS_APPROVED
-        }
-        critical_failed = any(
-            sector.is_critical_failure(self.population.value)
-            for sector in self.sectors.values()
-        )
-        if critical_failed:
-            self.last_total_allocation = sum(sector.allocation for sector in self.sectors.values())
-            return True
-
-        self.last_total_allocation = 0.0
         for sector in self.sectors.values():
-            self.last_total_allocation += sector.allocation
-            self.treasury.debit(sector.allocation)
-        return False
+            sector.allocate(float(sector.critical(pop)))
+        self.treasury.debit(total_c)
+
+        disc_debited = 0.0
+        for proposal in self.proposals:
+            if proposal.status != PROPOSAL_STATUS_APPROVED:
+                continue
+            disc = float(proposal.amount)
+            department = proposal.department
+            self.sectors[department].allocate(self.sectors[department].allocation + disc)
+            self.treasury.debit(disc)
+            disc_debited += disc
+
+        self.last_total_discretionary = disc_debited
+        self.last_total_allocation = total_c + disc_debited
+        if any(
+            sector.is_critical_failure(self.population.value) for sector in self.sectors.values()
+        ):
+            return "critical_invariant"
+        return "ok"
 
     def _tally_votes(self) -> None:
-        remaining_treasury = self.treasury.balance
+        total_c = self._total_critical_funding()
+        remaining = max(0.0, self.treasury.balance - total_c)
         for proposal in self.proposals:
             if proposal.status != PROPOSAL_STATUS_PENDING:
                 continue
             yes_votes = sum(1 for vote in proposal.votes.values() if vote == VoteChoice.YES.value)
             no_votes = sum(1 for vote in proposal.votes.values() if vote == VoteChoice.NO.value)
-            if proposal.amount > remaining_treasury:
+            if proposal.amount > remaining:
                 proposal.status = PROPOSAL_STATUS_REJECTED
                 proposal.rejection_reason = "exceeds_remaining_treasury"
             elif yes_votes > no_votes:
                 proposal.status = PROPOSAL_STATUS_APPROVED
-                remaining_treasury -= proposal.amount
+                remaining -= proposal.amount
             else:
                 proposal.status = PROPOSAL_STATUS_REJECTED
 
@@ -523,16 +572,21 @@ class NationGame:
     def _finish_round(
         self,
         *,
-        critical_failed: bool,
+        critical_failed: bool = False,
+        budget_bankruptcy: bool = False,
         terminate_immediately: bool = False,
         completed_round: int | None = None,
     ) -> None:
         completed_round = completed_round or self.round
-        if critical_failed:
+        hard_failure = critical_failed or budget_bankruptcy
+        if budget_bankruptcy or critical_failed:
             self.last_total_revenue = 0.0
             self.last_total_surplus = 0.0
             self.done = True
-            self.termination_reason = TERMINATION_CRITICAL_FAILURE
+            if budget_bankruptcy:
+                self.termination_reason = TERMINATION_BANKRUPTCY
+            else:
+                self.termination_reason = TERMINATION_CRITICAL_FAILURE
         else:
             revenue_factors = [sector.revenue_factor_value for sector in self.sectors.values()]
             self.productivity.update(revenue_factors)
@@ -543,7 +597,7 @@ class NationGame:
         prosperity = self.last_total_revenue / max(self.population.value, 1)
         zone_penalty_overrides = (
             {"over_allocated_count": 0, "under_allocated_count": 0}
-            if critical_failed
+            if hard_failure
             else {}
         )
         self.last_reward = compute_reward(
@@ -552,7 +606,7 @@ class NationGame:
             population=self.population.value,
             productivity=self.productivity.value,
             round_num=completed_round,
-            critical_failed=critical_failed,
+            critical_failed=hard_failure,
             **zone_penalty_overrides,
             productivity_bonus_scale=self.config.PRODUCTIVITY_BONUS_SCALE,
             survival_bonus_per_round=self.config.SURVIVAL_BONUS_PER_ROUND,
@@ -587,7 +641,7 @@ class NationGame:
             self.termination_reason = TERMINATION_MAX_ROUNDS
 
     def _update_shutdown_counter(self) -> None:
-        if self.last_total_allocation == 0:
+        if self.last_total_discretionary == 0:
             self.shutdown_counter += 1
         else:
             self.shutdown_counter = 0
@@ -658,17 +712,20 @@ class NationGame:
         self.phase = Phase.PROPOSAL
 
     def apply_fallback_allocations(self, departments: list[str]) -> None:
-        """Auto-assign baseline demand for departments that exhausted retries.
-
-        Creates approved proposals at baseline demand for each department.
-        """
+        """Auto-assign a discretionary request for departments that exhausted retries."""
         for dept in departments:
             if dept in self.sectors and dept not in self._submitted_departments:
-                baseline = self.sectors[dept].baseline
+                sector = self.sectors[dept]
+                c = float(sector.critical)
+                dem = float(sector.demand)
+                b = float(sector.baseline)
+                pool = max(0.0, self.treasury.balance - self._total_critical_funding())
+                want = max(0.0, min(dem, b) - c)
+                disc = min(want, pool)
                 self._new_proposal(
                     agent_id=dept,
                     department=dept,
-                    amount=baseline,
+                    amount=disc,
                     justification="Fallback: baseline demand after retry exhaustion.",
                     status="approved",
                 )
@@ -705,7 +762,8 @@ class NationGame:
             return "wrong_department"
         if amount_value < 0 or math.isnan(amount_value) or math.isinf(amount_value):
             return "invalid_amount"
-        if amount_value > self.treasury.balance:
+        total_c = self._total_critical_funding()
+        if amount_value > max(0.0, self.treasury.balance - total_c):
             return "exceeds_treasury"
         return None
 

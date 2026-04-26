@@ -38,9 +38,8 @@ adapter.act(observation, valid_actions, agent_id) -> Action
 One structured action:
 
 - `DEBATE`
-- `PROPOSE_BUDGET`
+- `PROPOSE_BUDGET` (proposal amounts are **discretionary**; critical minima are auto-funded and need not be proposed)
 - `VOTE`
-- `ABSTAIN_FROM_PROPOSAL`
 
 Adapters suggest actions only. The environment validates phase constraints, treasury limits, proposal ownership, vote eligibility, and termination.
 
@@ -168,7 +167,7 @@ Do **not** use this mode for:
 
 - The hackathon's headline research question on decentralised debate vs. central planning. That comparison must use the parliamentary interface (and, where appropriate, the dictator adapter from *Required Adapter Families*) so that observed differences are attributable to the negotiation protocol rather than the action interface.
 - Training or evaluating any LLM or parliamentary-LLM adapter.
-- Reporting against the baseline ranking in *Evaluation Protocol* below. Those baselines are defined over the structured `PROPOSE_BUDGET / VOTE / DEBATE / ABSTAIN_FROM_PROPOSAL` action space; direct-allocation runs are not directly comparable to them.
+- Reporting against the baseline ranking in *Evaluation Protocol* below. Those baselines are defined over the structured `PROPOSE_BUDGET / VOTE / DEBATE` action space; direct-allocation runs are not directly comparable to them.
 
 ### Reporting Requirements
 

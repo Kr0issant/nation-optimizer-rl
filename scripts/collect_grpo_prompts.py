@@ -10,7 +10,7 @@ JSONL record with everything the reward function needs:
   legal in this phase.
 - ``treasury``, ``own_sector`` (critical/demand/surplus), ``proposals`` and
   ``all_sectors``: public state needed by the reward function to score
-  ``PROPOSE_BUDGET`` / ``VOTE`` / ``ABSTAIN`` completions against the same
+  ``PROPOSE_BUDGET`` / ``VOTE`` completions against the same
   piecewise revenue math the engine uses.
 
 Phase 2 (``DEBATE``) prompts are deliberately excluded — debate is inference
@@ -162,7 +162,9 @@ def _make_record(
         "valid_actions": sorted(valid_action_set),
         "phase": Phase(state["phase"]).name,
         "round": int(state["round"]),
+        "max_rounds": int(state.get("max_rounds", 0) or 0),
         "treasury": float(state["treasury"]),
+        "total_critical": float(state.get("total_critical", 0.0) or 0.0),
         "own_sector": {"name": agent_id, **own_sector},
         "proposals": proposals,
         "all_sectors": sectors,

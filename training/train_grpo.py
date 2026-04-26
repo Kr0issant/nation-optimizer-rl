@@ -51,6 +51,7 @@ print(f"DEBUG: sys.path={sys.path}")
 
 
 DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
+# Regenerate with `python -m scripts.collect_grpo_prompts` after game/economy changes.
 DEFAULT_DATASET_ID = "nation-optimizer/nation-parliamentary-prompts"
 DEFAULT_HUB_MODEL_ID = "nation-optimizer/nation-parliamentary-grpo-lora"
 

@@ -1,11 +1,11 @@
-"""Equal-split baseline: request an even share of the visible treasury."""
+"""Equal-split baseline: even share of the discretionary pool."""
 
 from collections.abc import Iterable
 
 from agents.base import PolicyAdapter
+from agents.rule_based.discretionary import discretionary_pool
 from agents.rule_based.voting import first_vote_target
 from schemas.actions import (
-    AbstainProposalAction,
     Action,
     ActionType,
     DebateAction,
@@ -31,12 +31,13 @@ class EqualSplitAdapter(PolicyAdapter):
     ) -> Action:
         valid_action_set = set(valid_actions)
         if ActionType.PROPOSE_BUDGET.value in valid_action_set:
-            share = observation.treasury / self.department_count
+            pool = discretionary_pool(observation)
+            share = pool / self.department_count
             return ProposeBudgetAction(
                 type=ActionType.PROPOSE_BUDGET,
                 department=observation.own_department.name,
                 amount=share,
-                justification="Request an equal share of the visible treasury.",
+                justification="Request an equal share of the discretionary treasury pool.",
             )
 
         vote_target = first_vote_target(observation.proposals, agent_id)
@@ -53,4 +54,7 @@ class EqualSplitAdapter(PolicyAdapter):
                 message=f"{agent_id} supports equal treasury distribution.",
             )
 
-        return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
+        return DebateAction(
+            type=ActionType.DEBATE,
+            message=f"{agent_id} (equal split) idle.",
+        )

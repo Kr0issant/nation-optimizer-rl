@@ -6,9 +6,9 @@ import random
 from collections.abc import Callable, Iterable
 
 from agents.base import PolicyAdapter
+from agents.rule_based.discretionary import discretionary_pool
 from agents.rule_based.voting import is_vote_target
 from schemas.actions import (
-    AbstainProposalAction,
     Action,
     ActionType,
     DebateAction,
@@ -31,7 +31,10 @@ class RandomAdapter(PolicyAdapter):
     ) -> Action:
         candidates = self._candidate_actions(observation, set(valid_actions), agent_id)
         if not candidates:
-            return AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL)
+            return DebateAction(
+                type=ActionType.DEBATE,
+                message=f"{agent_id} has no valid structured actions; sending a minimal debate message.",
+            )
         return self.rng.choice(candidates)()
 
     def _candidate_actions(
@@ -54,19 +57,23 @@ class RandomAdapter(PolicyAdapter):
             )
 
         if ActionType.DEBATE.value in valid_actions:
-            candidates.append(lambda: DebateAction(type=ActionType.DEBATE, message=f"{agent_id} shares a random priority signal."))
-
-        if ActionType.ABSTAIN_FROM_PROPOSAL.value in valid_actions:
-            candidates.append(lambda: AbstainProposalAction(type=ActionType.ABSTAIN_FROM_PROPOSAL))
+            candidates.append(
+                lambda: DebateAction(
+                    type=ActionType.DEBATE,
+                    message=f"{agent_id} shares a random priority signal.",
+                )
+            )
 
         return candidates
 
     def _proposal_action(self, observation: Observation) -> ProposeBudgetAction:
+        pool = discretionary_pool(observation)
+        hi = max(pool, 0.0)
         return ProposeBudgetAction(
             type=ActionType.PROPOSE_BUDGET,
             department=observation.own_department.name,
-            amount=self.rng.uniform(0.0, max(observation.treasury, 0.0)),
-            justification="Random legal budget request sampled from the visible treasury.",
+            amount=self.rng.uniform(0.0, hi),
+            justification="Random legal discretionary amount sampled from the available pool.",
         )
 
     @staticmethod

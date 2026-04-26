@@ -14,6 +14,8 @@ class OwnDepartmentObservation:
     surplus: float | None = None
     efficiency_rating: float | None = None
     treasury_surplus_returned_this_round: float | None = None
+    critical: float = 0.0
+    demand: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,3 +47,5 @@ class Observation:
     debate_messages: tuple[dict[str, str], ...] = field(default_factory=tuple)
     target_proposal_id: str | None = None
     termination: dict[str, Any] = field(default_factory=dict)
+    total_critical: float = 0.0
+    max_rounds: int = 0
