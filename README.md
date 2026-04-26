@@ -18,7 +18,7 @@ pinned: false
 
 ### 🔗 Submission Quick-Links
 *   **🚀 Hugging Face Space**: [Nation Optimizer](https://huggingface.co/spaces/ascentftw/nation_optimizer)
-*   **📓 Training Notebook**: [Open in Colab (`notebooks/colab_grpo_training.ipynb`)](https://colab.research.google.com/github/Kr0issant/communism-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb) — use GitHub org **`Kr0issant`** (with **two s** in the middle) or, if the repo was renamed, [`nation-optimizer-rl`](https://colab.research.google.com/github/Kr0issant/nation-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb)
+*   **📓 Training Notebook (Colab):** [Open in Colab](https://colab.research.google.com/github/Kr0issant/communism-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb) — the GitHub owner must be spelled **`Kr0issant`** (**`K` `r` `0` `i` `s` `s` `a` `n` `t`**, two `s`). A one-`s` typo (`Kr0isan`) returns *Notebook not found*. Alt: [same file under `nation-optimizer-rl`](https://colab.research.google.com/github/Kr0issant/nation-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb).
 *   **📊 Training Evidence**: [Reward & Loss Curves](assets/results/)
 *   **📽️ Project Presentation**: [YouTube Video / Blog Post Placeholder](https://huggingface.co/blog/your-username/nation-optimizer)
 
@@ -216,7 +216,7 @@ Hugging Face may show a Space under a **community** team (for example [`ascentft
 
 ### Reproduce the run
 
-**Google Colab (uv + full TRL loop):** open [`notebooks/colab_grpo_training.ipynb`](https://colab.research.google.com/github/Kr0issan/communism-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb) — installs the repo with `uv sync --extra training`, runs the OpenEnv smoke check, then `training/train_grpo.py` (loss/reward plot via `--plot-path`).
+**Google Colab (uv + full TRL loop):** open [`notebooks/colab_grpo_training.ipynb`](https://colab.research.google.com/github/Kr0issant/communism-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb) — installs the repo with `uv sync --extra training`, runs the OpenEnv smoke check, then `training/train_grpo.py` (loss/reward plot via `--plot-path`). If Colab errors, the GitHub owner in the link must be **`Kr0issant`**, not `Kr0isan` (see “Submission Quick-Links” above).
 
 Create the **Hugging Face Dataset** (this is a `datasets/…` repo, not your Space) and upload it in one go. You must be logged in (`huggingface-cli login` / `hf auth login`, or set `HF_TOKEN` with write access to the target namespace/organization).
 
