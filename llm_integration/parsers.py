@@ -27,13 +27,12 @@ def parse_action_json(payload: str | dict[str, Any], target_proposal_id: str | N
     """Parses a JSON string or dict into an internal Action object."""
     if isinstance(payload, str):
         payload = payload.strip()
-        if payload.startswith("```json"):
-            payload = payload[7:]
-        elif payload.startswith("```"):
-            payload = payload[3:]
-        if payload.endswith("```"):
-            payload = payload[:-3]
-        payload = payload.strip()
+        
+        # Robust extraction: find the first '{' and the last '}'
+        start = payload.find('{')
+        end = payload.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            payload = payload[start:end+1]
         
         try:
             data = json.loads(payload)
