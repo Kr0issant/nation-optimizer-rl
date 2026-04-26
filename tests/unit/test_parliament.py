@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from core.parliament import ParliamentRoundState, Proposal, ProposalAbstention, VoteRecord
+from core.parliament import ParliamentRoundState, Proposal, VoteRecord
 from schemas.actions import ActionType, VoteChoice
 from schemas.phases import Phase
 

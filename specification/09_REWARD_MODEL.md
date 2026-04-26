@@ -36,8 +36,10 @@ Where:
 ### Per-Step Reward
 
 ```
-R_t = Base_Reward_t + Productivity_Bonus_t + Survival_Bonus_t + Allocation_Penalty_t - Critical_Penalty_t
+R_t = Base_Reward_t + Productivity_Bonus_t + Survival_Bonus_t + Allocation_Penalty_t + Bankruptcy_Adjustment_t
 ```
+
+Under Option A there is **no** `-1000` “critical failure” penalty component: mandatory critical funding prevents that termination class. **Bankruptcy** may still apply a large negative adjustment via the same bookkeeping field in code (`critical_penalty` slot used for `BANKRUPTCY_PENALTY` in the reference implementation).
 
 ### Component Definitions
 
@@ -60,7 +62,7 @@ R_t = Base_Reward_t + Productivity_Bonus_t + Survival_Bonus_t + Allocation_Penal
 #### Survival Bonus
 
 - `Survival_Bonus_t = +10 × Rounds_Survived_t`
-- Encourages longevity and avoiding critical failure
+- Encourages longevity and sustained governance
 - Each round survived adds 10 to reward (accumulates over episode)
 - At round 10: survival bonus = 100
 - At round 50: survival bonus = 500
@@ -86,12 +88,10 @@ The piecewise curve creates three allocation zones with different penalty struct
 - This is the profit zone where revenue factor ranges from 1.0 to 1.8
 - Agents WANT to allocate in this zone, not exactly at demand
 
-#### Critical Penalty
+#### Bankruptcy adjustment (termination)
 
-- `Critical_Penalty_t = -1000` if `Allocation_d < Critical_d` for ANY sector
-- Large penalty triggers immediate episode termination
-- Final prosperity = `(Treasury + Total_Revenue) / Population` at termination
-- Rationale: Catastrophic failure requires strong disincentive; no recovery possible once below critical
+- When the episode ends in **BANKRUPTCY**, the reference implementation applies a large negative penalty (same magnitude historically used for hard failures) so terminal states remain clearly worse than healthy survival
+- There is **no** parallel penalty for “critical failure” as a termination reason — that condition was removed under Option A
 
 ---
 
@@ -107,12 +107,12 @@ The piecewise curve creates three allocation zones with different penalty struct
 
 - `Episode_Total = Sum(R_t for t = 1 to T)`
 - Sum of all per-step rewards across the episode
-- Maximized when episode reaches maximum rounds without critical failure
+- Maximized when episode reaches maximum rounds without bankruptcy / shutdown
 
-### Critical Failure Termination
+### Bankruptcy termination
 
-- If critical failure occurs at step t:
-  - Reward for step t includes -1000 critical penalty
+- If bankruptcy occurs at step t:
+  - Reward for step t includes the configured bankruptcy penalty (reference: -1000 via penalty slot)
   - Episode terminates immediately
   - Steps t+1 through T receive 0
 
@@ -168,7 +168,7 @@ Understanding allocation zones is essential for reward optimization:
 
 | Zone | Allocation Range | Revenue Factor | Reward Treatment |
 |------|-----------------|----------------|------------------|
-| **Critical Failure** | `x < Critical_d` | N/A | GAME OVER (-1000 penalty, episode ends) |
+| **At / above critical** | `x ≥ Critical_d` | 0 at critical, then 0–1.0 to demand | Under-demand band uses under-allocation penalty when `x < Demand_d` |
 | **Under-Funded** | `Critical_d ≤ x < Demand_d` | 0 to 1.0 (linear) | -10 per sector (under-allocation penalty) |
 | **Profit Zone** | `Demand_d ≤ x ≤ Surplus_d` | 1.0 to 1.8 (linear) | NO PENALTY (agents want to be here) |
 | **Wastage Zone** | `x > Surplus_d` | 1.8 decaying to 1.0+ | -5 per sector (over-allocation penalty) |
@@ -279,46 +279,15 @@ R_t = 0.000509 + 10 + 100 - 10 - 0 = 100.000509
 
 ---
 
-### Example 3: Critical Failure Round (Game Over)
+### Example 3: Bankruptcy Round (Game Over)
 
 **Setup:**
-- Treasury = 800
-- Population = 1,020,000
-- Productivity = 0.8 (sustained losses decreased productivity)
-- Round 15: Commerce allocation severely cut due to budget constraints
-- Commerce allocation below critical threshold
-
-**Critical Failure Scenario:**
-- Commerce: Baseline=75, Demand=75, Critical=30
-- Allocation = 25 (below critical of 30)
-
-**Revenue Check:**
-- Allocation (25) < Critical (30)
-- CRITICAL FAILURE: Episode terminates immediately
+- Treasury cannot cover `sum(Critical_d)` at Phase 5 execution (mandatory spend exceeds balance)
+- Episode terminates with **BANKRUPTCY**
 
 **Reward at Termination:**
-```
-Base_Reward = Prosperity_t (calculated before termination)
-Productivity_Bonus = +50 × (0.8 - 1.0) = -10 (low productivity)
-Survival_Bonus = +10 × 15 = +150 (15 rounds survived)
-Over_Allocation_Penalty = 0 (failure occurs before zone calculation)
-Under_Allocation_Penalty = 0 (failure occurs before zone calculation)
-Critical_Penalty = -1000 (sector below critical)
-
-R_t = Base_Reward + Productivity_Bonus + Survival_Bonus - 1000
-```
-
-Assume treasury and revenue before failure:
-- Treasury at termination = 800
-- Revenue generated = 0 (commerce failed before generating revenue)
-- Final prosperity = (800 + 0) / 1,020,000 = 0.000784
-- Base_Reward = 0.000784
-
-```
-R_15 = 0.000784 + (-10) + 150 - 1000 = -859.999216
-```
-
-**Result:** Large negative reward of approximately -860 due to critical penalty. Episode terminates; no further rewards accumulated.
+- Reference implementation: large negative bankruptcy adjustment on the terminal step (e.g. -1000 in the penalty slot), plus usual components where applicable
+- No separate “critical failure” component
 
 ---
 
@@ -331,7 +300,7 @@ R_15 = 0.000784 + (-10) + 150 - 1000 = -859.999216
 | Survival Bonus | `+10 × Rounds_Survived_t` | [0, +inf) |
 | Over-Allocation Penalty | `-5 × Count(sectors where Allocation > Surplus)` | (-inf, 0] |
 | Under-Allocation Penalty | `-10 × Count(sectors where Critical ≤ Allocation < Demand)` | (-inf, 0] |
-| Critical Penalty | `-1000 if any sector below Critical else 0` | {-1000, 0} |
+| Bankruptcy adjustment | Large negative on terminal bankruptcy step (implementation-defined) | (-inf, 0] |
 
 ---
 
@@ -355,11 +324,10 @@ R_15 = 0.000784 + (-10) + 150 - 1000 = -859.999216
 - High productivity amplifies all revenue generation, creating compounding rewards
 - This connects budget decisions to multi-round strategy, not just single-round optimization
 
-### Critical Threshold Severity
+### Mandatory critical and discretionary incentives
 
-- Below critical = immediate game over
-- Strong disincentive ensures agents maintain minimum viable funding across all sectors
-- Survival bonus accumulates faster than critical penalty recovery is possible
+- Auto-critical guarantees survival funding when solvent, so reward shaping focuses on **discretionary** investment and zone penalties (under / over demand vs. surplus)
+- Treasury stress appears as **bankruptcy** when mandatory spend is unaffordable
 
 ### Population Dynamics Impact
 
@@ -380,8 +348,8 @@ R_15 = 0.000784 + (-10) + 150 - 1000 = -859.999216
 | Efficiency Zone | `Allocation ≈ Need` (exact match) | `Demand ≤ Allocation ≤ Surplus` (profit zone) |
 | Over-Allocation | `-5 × Count(Allocation > Need)` | `-5 × Count(Allocation > Surplus)` (wastage zone only) |
 | Under-Allocation | `-10 × Count(Allocation < Need)` | `-10 × Count(Critical ≤ Allocation < Demand)` |
-| Failure Mode | Bankruptcy (treasury ≤ 0) | Critical Failure (any sector < Critical) |
-| Penalty Severity | -1000 for bankruptcy | -1000 for critical failure |
+| Failure Mode | Bankruptcy (treasury ≤ 0 or cannot pay `sum(Critical_d)` at execution) | (Critical failure termination removed under Option A) |
+| Penalty Severity | Large negative on terminal step (e.g. -1000) | — |
 
 **Key shift**: The new model rewards profit zone behavior rather than exact demand matching. Agents can target ~1.3× demand for peak revenue factor of 1.8 without penalty.
 

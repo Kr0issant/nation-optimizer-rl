@@ -87,7 +87,7 @@ UNDERFUNDED_SURVIVABLE_REWARD = RewardScenario(
 )
 
 CRITICAL_FAILURE_REWARD = RewardScenario(
-    name="critical_failure_reward",
+    name="below_critical_zero_revenue_reward",
     economy=CRITICAL_FAILURE,
     population=INITIAL_POPULATION,
     productivity=INITIAL_PRODUCTIVITY,
@@ -98,8 +98,8 @@ CRITICAL_FAILURE_REWARD = RewardScenario(
         survival_bonus=10.0,
         over_allocation_penalty=0.0,
         under_allocation_penalty=0.0,
-        critical_penalty=-1000.0,
-        total=-990.0,
+        critical_penalty=0.0,
+        total=10.0,
     ),
 )
 

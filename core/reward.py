@@ -1,14 +1,19 @@
 """
 reward.py — Per-step reward calculator.
 
-Implements the full reward formula from spec 09:
+Implements the reward formula from spec 09 (Option A):
 
   R_t = Base_Reward
       + Productivity_Bonus
       + Survival_Bonus
       + Over_Allocation_Penalty
       + Under_Allocation_Penalty
-      - Critical_Penalty
+
+The ``critical_penalty`` field on :class:`RewardBreakdown` is reserved for
+episode-ending financial failure: :class:`core.game.NationGame` may set it to
+``BANKRUPTCY_PENALTY`` when the treasury cannot cover mandatory critical funding.
+There is no separate reward penalty for "critical failure" termination — that
+outcome was removed under auto-funded critical (Option A).
 """
 
 from __future__ import annotations
@@ -31,7 +36,7 @@ class RewardBreakdown:
     survival_bonus: float       # +10 × round_num
     over_alloc_penalty: float   # -5 × count(sectors in wastage zone)
     under_alloc_penalty: float  # -10 × count(sectors between critical and demand)
-    critical_penalty: float     # -1000 if any sector below critical
+    critical_penalty: float     # set by NationGame on bankruptcy only (default 0)
 
     @property
     def over_allocation_penalty(self) -> float:
@@ -51,7 +56,7 @@ class RewardBreakdown:
             + self.survival_bonus
             + self.over_alloc_penalty
             + self.under_alloc_penalty
-            + self.critical_penalty  # already negative
+            + self.critical_penalty  # bankruptcy override when set
         )
 
     def to_dict(self) -> dict:
@@ -72,18 +77,15 @@ def compute_reward(
     population: int | None = None,
     productivity: float = INITIAL_PRODUCTIVITY,
     round_num: int | None = None,
-    critical_failed: bool | None = None,
     *,
     prosperity: float | None = None,
     rounds_survived: int | None = None,
     over_allocated_count: int | None = None,
     under_allocated_count: int | None = None,
-    critical_failure_occurred: bool | None = None,
     productivity_bonus_scale: float = 50.0,
     survival_bonus_per_round: float = 10.0,
     over_alloc_penalty_val: float = -5.0,
     under_alloc_penalty_val: float = -10.0,
-    critical_penalty_val: float = -1000.0,
 ) -> RewardBreakdown:
     """
     Compute the per-step reward.
@@ -100,8 +102,6 @@ def compute_reward(
         Current national productivity.
     round_num : int
         Current round number (1-indexed).
-    critical_failed : bool
-        True if any sector fell below critical this round.
 
     Returns
     -------
@@ -137,18 +137,13 @@ def compute_reward(
     over_penalty = over_alloc_penalty_val * over_count
     under_penalty = under_alloc_penalty_val * under_count
 
-    # Critical penalty
-    if critical_failure_occurred is not None:
-        critical_failed = critical_failure_occurred
-    crit_penalty = critical_penalty_val if critical_failed else 0.0
-
     return RewardBreakdown(
         base_reward=base_reward,
         productivity_bonus=prod_bonus,
         survival_bonus=survival,
         over_alloc_penalty=over_penalty,
         under_alloc_penalty=under_penalty,
-        critical_penalty=crit_penalty,
+        critical_penalty=0.0,
     )
 
 
