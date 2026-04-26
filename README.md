@@ -15,10 +15,10 @@ pinned: false
 ---
 
 ### 🔗 Submission Quick-Links
-*   **🚀 Hugging Face Space**: [Nation Optimizer](https://huggingface.co/spaces/ascentftw/nation_optimizer)
+*   **🚀 Hugging Face Space**: [Nation Optimizer Spectator Dashboard](https://huggingface.co/spaces/Kr0issant/nation-optimizer-rl)
 *   **📓 Training Notebook**: [Open in Colab (training.ipynb)](https://colab.research.google.com/github/Kr0issant/communism-optimizer-rl/blob/main/training.ipynb)
-*   **📊 Training Evidence**: [Trackio Curves](https://huggingface.co/spaces/nation-optimizer/grpo-parliamentary) · [Benchmark Results](assets/results/)
-*   **📽️ Project Presentation**: [nation-optimizer-grpo](https://huggingface.co/blog/ascentftw/nation-optimizer)
+*   **📊 Training Evidence**: [Reward & Loss Curves](assets/results/)
+*   **📽️ Project Presentation**: [YouTube Video / Blog Post Placeholder](https://huggingface.co/blog/your-username/nation-optimizer)
 
 ---
 

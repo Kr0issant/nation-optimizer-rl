@@ -25,7 +25,6 @@ PROPOSAL_STATUS_PENDING = "pending"
 PROPOSAL_STATUS_APPROVED = "approved"
 PROPOSAL_STATUS_REJECTED = "rejected"
 PROPOSAL_STATUS_REJECTED_INVALID = "rejected_invalid"
-TERMINATION_CRITICAL_FAILURE = "CRITICAL_FAILURE"
 TERMINATION_BANKRUPTCY = "BANKRUPTCY"
 TERMINATION_SHUTDOWN = "SHUTDOWN"
 TERMINATION_MAX_ROUNDS = "MAX_ROUNDS"
@@ -416,9 +415,6 @@ class NationGame:
             if budget_status == "bankruptcy":
                 self._finish_round(budget_bankruptcy=True, terminate_immediately=True)
                 info["termination_reason"] = self.termination_reason
-            elif budget_status == "critical_invariant":
-                self._finish_round(critical_failed=True, terminate_immediately=True)
-                info["termination_reason"] = self.termination_reason
         elif self.phase == Phase.CONSUMPTION_AND_EVENT_IMPACT and not self.done:
             self._compute_consumption()
         elif self.phase == Phase.REVENUE_CALCULATION and not self.done:
@@ -428,7 +424,7 @@ class NationGame:
             self.treasury.credit(self.last_total_surplus)
             self.treasury.apply_baseline_tax()
         elif self.phase == Phase.TERMINATION_CHECK and not self.done:
-            self._finish_round(critical_failed=False)
+            self._finish_round()
             info["termination_reason"] = self.termination_reason
 
     def _run_direct_allocation_round(self, allocations: Mapping[str, Any]) -> StepResult:
@@ -488,7 +484,7 @@ class NationGame:
         self.treasury.credit(self.last_total_surplus)
         self.treasury.apply_baseline_tax()
 
-        self._finish_round(critical_failed=False, completed_round=self.round)
+        self._finish_round(completed_round=self.round)
         info = {
             "accepted_actions": [{"type": "DIRECT_ALLOCATION"}],
             "ignored_actions": [],
@@ -496,11 +492,13 @@ class NationGame:
             "termination_reason": self.termination_reason,
         }
         self.last_info = info
+        completed_round_num = self.round
+        end_observation = self.state()
         if not self.done:
             self.round += 1
             self.phase = Phase.EVENT_REVELATION
             self._start_round()
-        return self._result(info, completed_round=self.round - 1 if not self.done else self.round)
+        return self._result(info, completed_round=completed_round_num, observation=end_observation)
 
     def _total_critical_funding(self) -> float:
         """Total critical minimum spend for all sectors this round (population-based)."""
@@ -534,10 +532,6 @@ class NationGame:
 
         self.last_total_discretionary = disc_debited
         self.last_total_allocation = total_c + disc_debited
-        if any(
-            sector.is_critical_failure(self.population.value) for sector in self.sectors.values()
-        ):
-            return "critical_invariant"
         return "ok"
 
     def _tally_votes(self) -> None:
@@ -572,21 +566,17 @@ class NationGame:
     def _finish_round(
         self,
         *,
-        critical_failed: bool = False,
         budget_bankruptcy: bool = False,
         terminate_immediately: bool = False,
         completed_round: int | None = None,
     ) -> None:
         completed_round = completed_round or self.round
-        hard_failure = critical_failed or budget_bankruptcy
-        if budget_bankruptcy or critical_failed:
+        hard_failure = budget_bankruptcy
+        if budget_bankruptcy:
             self.last_total_revenue = 0.0
             self.last_total_surplus = 0.0
             self.done = True
-            if budget_bankruptcy:
-                self.termination_reason = TERMINATION_BANKRUPTCY
-            else:
-                self.termination_reason = TERMINATION_CRITICAL_FAILURE
+            self.termination_reason = TERMINATION_BANKRUPTCY
         else:
             revenue_factors = [sector.revenue_factor_value for sector in self.sectors.values()]
             self.productivity.update(revenue_factors)
@@ -606,13 +596,11 @@ class NationGame:
             population=self.population.value,
             productivity=self.productivity.value,
             round_num=completed_round,
-            critical_failed=hard_failure,
             **zone_penalty_overrides,
             productivity_bonus_scale=self.config.PRODUCTIVITY_BONUS_SCALE,
             survival_bonus_per_round=self.config.SURVIVAL_BONUS_PER_ROUND,
             over_alloc_penalty_val=self.config.OVER_ALLOC_PENALTY,
             under_alloc_penalty_val=self.config.UNDER_ALLOC_PENALTY,
-            critical_penalty_val=self.config.CRITICAL_PENALTY,
         )
         if self.termination_reason == TERMINATION_BANKRUPTCY:
             self.last_reward.critical_penalty = self.config.BANKRUPTCY_PENALTY
@@ -770,8 +758,14 @@ class NationGame:
     def _proposal_by_id(self, proposal_id: str) -> Proposal | None:
         return next((proposal for proposal in self.proposals if proposal.proposal_id == proposal_id), None)
 
-    def _result(self, info: dict[str, Any], completed_round: int | None = None) -> StepResult:
-        observation = self.state()
+    def _result(
+        self,
+        info: dict[str, Any],
+        completed_round: int | None = None,
+        *,
+        observation: dict[str, Any] | None = None,
+    ) -> StepResult:
+        observation = dict(observation) if observation is not None else self.state()
         if completed_round is not None:
             year, quarter = self._year_quarter(completed_round)
             observation["round"] = completed_round

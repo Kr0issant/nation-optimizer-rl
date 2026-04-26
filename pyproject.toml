@@ -11,6 +11,16 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
+    "unsloth>=2026.4.8",
+    "trl>=0.24.0",
+    "peft>=0.19.1",
+    "transformers>=5.5.0",
+    "accelerate>=1.13.0",
+    "datasets>=4.3.0",
+    "trackio>=0.25.0",
+    "matplotlib>=3.10.9",
+    "seaborn>=0.13.2",
+    "gradio>=4.19.2",
 ]
 
 [project.optional-dependencies]

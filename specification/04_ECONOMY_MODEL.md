@@ -1,6 +1,6 @@
 # 04 — Economy Model
 
-> Defines the complete economic engine: treasury calculation, revenue generation, productivity system, population dynamics, and critical failure conditions.
+> Defines the complete economic engine: treasury calculation, revenue generation, productivity system, population dynamics, and mandatory vs. discretionary budgeting (Option A).
 
 ---
 
@@ -40,7 +40,7 @@ Where:
 
 - `Critical_d = Demand_d × 0.4`
 
-This is the minimum viable allocation. Below this: **GAME OVER**.
+This is the **mandatory survival floor** funded automatically in Phase 5 (Step 0) before discretionary proposals execute. It is not a separate episode termination concept: if the treasury cannot pay `sum(Critical_d)`, the episode ends with **BANKRUPTCY**.
 
 ### Surplus Threshold
 
@@ -63,7 +63,7 @@ The revenue factor determines how efficiently allocation converts to revenue.
 ### Revenue Factor Formula
 
 ```
-         ⎧ None                           if x < Critical_d          (CRITICAL FAILURE)
+         ⎧ None                           if x < Critical_d          (invalid / no revenue)
          ⎪
 RF(x) =  ⎨ (x - Critical_d) / (Demand_d - Critical_d)   if Critical_d ≤ x < Demand_d
          ⎪
@@ -88,7 +88,7 @@ Revenue Factor (y)
     └──────┬────┬──────┬────→ Allocation (x)
          Critical Demand Surplus Wastage
 
-A (Critical): Revenue factor = 0, below = game over
+A (Critical): Revenue factor = 0 at exactly Critical; below Critical is undefined / no revenue (should not occur after auto-critical in normal play)
 B (Demand): Revenue factor = 1.0 (break-even)
 C (Surplus): Revenue factor = 1.8 (peak profit)
 D (Wastage): Revenue factor = 1.0 (break-even again)
@@ -105,8 +105,8 @@ D (Wastage): Revenue factor = 1.0 (break-even again)
 
 | Allocation (% of Demand) | Revenue Factor | Interpretation |
 |--------------------------|----------------|-----------------|
-| 0-39% | FAIL | Critical failure (game over) |
-| 40% | 0 | At critical threshold (break-even) |
+| 0-39% | None / 0 RF | Below critical: no revenue in model; **Option A** funds at least critical when solvent |
+| 40% | 0 | At critical threshold (zero revenue — survival cost only) |
 | 50% | 0.25 | Linear segment mid-point |
 | 100% | 1.0 | At demand (break-even) |
 | 150% | 1.8 | At surplus (peak profit) |
@@ -120,7 +120,7 @@ import math
 
 def revenue_factor(x, critical, demand, surplus, wastage):
     if x < critical:
-        return None  # CRITICAL FAILURE: episode terminates
+        return None  # No revenue for sub-critical allocation (hypothetical if execution guarantees critical)
     elif x < demand:
         # Segment A→B: Linear from (critical, 0) to (demand, 1.0)
         return (x - critical) / (demand - critical)
@@ -158,7 +158,7 @@ def calculate_department_revenue(allocation, baseline, population, pop_0, event_
     rf = revenue_factor(allocation, critical, demand, surplus, wastage)
     
     if rf is None:
-        return None  # CRITICAL FAILURE - episode terminates
+        return None  # No revenue (sub-critical allocation)
     
     # Calculate revenue (same round)
     revenue = allocation * rf * productivity
@@ -168,27 +168,33 @@ def calculate_department_revenue(allocation, baseline, population, pop_0, event_
 
 ---
 
-## Critical Threshold (Game-Over Condition)
+## Mandatory vs. discretionary budget (Option A)
 
-### Immediate Termination
+### Mandatory (auto-critical)
 
-If `Allocation_d < Critical_d` for **ANY** department, the episode terminates immediately with **CRITICAL FAILURE**.
+- Each round in Phase 5 Step 0, every department receives `Critical_d` before discretionary is applied
+- Debit: `sum(Critical_d)` from treasury
+- Revenue factor at `Allocation = Critical_d` is **0** → **zero department revenue** from that slice (pure cost to treasury)
 
-### Critical Failure Check
+### Discretionary (Phase 3 proposals)
 
-- Checked immediately after budget allocation (Phase 5)
-- Any single department below critical triggers failure
-- Final prosperity = `(Treasury + sum(Revenue)) / Population`
+- Ministers request **additional** amounts ≥ 0 above `Critical_d`
+- Voting approves or rejects **growth** funding; rejection implies `Discretionary_d = 0` but **not** `Allocation_d = 0`
+- Total allocation: `Allocation_d = Critical_d + Discretionary_d`
 
-### Critical Threshold Behavior
+### Affordability
 
-| Scenario | Allocation | Critical | Result |
-|----------|------------|----------|--------|
-| Severe underfunding | 30% of demand | 40% of demand | GAME OVER |
-| Moderate underfunding | 40% of demand | 40% of demand | Break-even at 0 |
-| Adequate funding | 50% of demand | 40% of demand | Survives |
-| Well funded | 100% of demand | 40% of demand | Thrives |
-| Over funded | 150% of demand | 40% of demand | Peak profit zone |
+- If treasury cannot cover `sum(Critical_d)` at the start of Phase 5 execution, the episode ends with **BANKRUPTCY**
+- There is **no** `CRITICAL_FAILURE` termination reason in Option A
+
+### Reference: RF vs allocation (given execution guarantees)
+
+| Scenario | Allocation | Critical | RF | Notes |
+|----------|------------|----------|-----|--------|
+| At auto-critical only | Critical | Critical | 0 | No revenue |
+| Between critical and demand | Between | Critical | 0–1 linear | Under-demand zone |
+| At demand | Demand | Critical | 1.0 | Break-even |
+| Profit zone | Demand–Surplus | Critical | 1.0–1.8 | Primary growth target |
 
 ---
 

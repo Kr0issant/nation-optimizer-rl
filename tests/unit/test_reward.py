@@ -32,10 +32,10 @@ def test_under_and_over_penalties() -> None:
     assert reward.under_allocation_penalty == -30
 
 
-def test_critical_penalty() -> None:
-    reward = compute_reward(prosperity=0, critical_failure_occurred=True)
+def test_compute_reward_leaves_critical_penalty_zero() -> None:
+    reward = compute_reward(prosperity=0, rounds_survived=1)
 
-    assert reward.critical_penalty == -1000
+    assert reward.critical_penalty == 0.0
 
 
 def test_total_equals_component_sum() -> None:
@@ -45,7 +45,6 @@ def test_total_equals_component_sum() -> None:
         rounds_survived=3,
         over_allocated_count=1,
         under_allocated_count=2,
-        critical_failure_occurred=True,
     )
 
     assert reward.total == pytest.approx(

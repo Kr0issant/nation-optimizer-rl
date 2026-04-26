@@ -2,7 +2,7 @@
 
 ## Concept
 
-The RL Parliament Environment is a cooperative multi-agent simulation where LLM-powered ministers collectively manage a nation's treasury through sequential budget negotiations.
+The RL Parliament Environment is a centralized planning simulation with parliamentary narrative where an LLM learns resource allocation through structured reasoning.
 
 - Agents are **ministers** with distinct departmental portfolios (Health, Defense, Education, Infrastructure, etc.)
 - Each round, ministers propose budget allocations, debate, and vote on spending bills
@@ -24,10 +24,10 @@ The environment draws ideological inspiration from Marxist doctrine.
 
 The environment exists to:
 
-- **Train cooperative behavior** in LLM agents through collective reward structures
+- **Train long-horizon planning** through structured reasoning (parliamentary debate + voting)
 - **Explore sequential voting dynamics** where budget proposals pass through multiple stages of debate and approval
 - **Model hidden-information scenarios** where event costs are known only to the environment, forcing agents to reason under uncertainty
-- **Benchmark multi-agent cooperation** against baselines (random allocation, greedy agents)
+- **Benchmark structured reasoning** against direct planning (parliamentary vs. dictator baseline)
 - **Generate interpretable episodes** where agent reasoning and parliamentary deliberation are observable
 - **Time scale**: Each round represents 3 months (quarterly budgeting). A full episode spans 12.5 years (50 quarters)
 - **Piecewise revenue model**: The profit zone (Demand to Surplus) rewards moderate over-investment; agents must balance staying above Demand (for revenue factor > 1.0) against avoiding Wastage (beyond which revenue factor falls below 1.0)
@@ -37,7 +37,7 @@ The environment exists to:
 This specification targets:
 
 - **Hackathon participants** building on Meta's OpenEnv framework with Hugging Face LLM inference
-- **Multi-agent RL researchers** interested in cooperative resource allocation under partial information
+- **LLM reasoning and planning researchers** interested in interpretable resource allocation under partial information
 - **LLM reasoning researchers** exploring how language models navigate sequential negotiation and collective utility
 
 ## Non-Goals

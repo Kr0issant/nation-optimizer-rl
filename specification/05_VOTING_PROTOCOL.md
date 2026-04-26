@@ -40,11 +40,9 @@
 
 ### Proposing (Phase 3)
 
-- A minister MAY abstain from proposing a budget for their department
-- Abstaining from proposing means the minister skips their turn in the proposal sequence
-- No treasury change occurs for abstained proposals
-- Abstaining minister does NOT propose anything this round
-- Abstention MUST be an explicit choice (agents must actively signal they are abstaining)
+- **Proposal abstention is removed under Option A.** Every minister MUST submit a `PROPOSE_BUDGET` action each round
+- The proposal’s `amount` is **discretionary** (≥ 0). Submitting **0** means “no extra above auto-critical” — it is not an abstention from the phase
+- Invalid proposals are rejected as invalid submissions; ministers must correct and resubmit until the phase completes
 
 ### Voting (Phase 4)
 
@@ -58,19 +56,19 @@
 
 ## Approval Consequences
 
-- **Approved**: Treasury is debited by the approved amount in Phase 5
-- **Approved**: Department receives the allocated budget
-- **Rejected**: No treasury change occurs
-- **Rejected**: Department receives zero allocation this round
+- **Approved (discretionary)**: In Phase 5 Step 1, treasury is debited by the **approved discretionary amount** for that department (in addition to the Step 0 auto-critical debit for all departments)
+- **Approved**: Department total allocation = `Critical_d + Discretionary_d`
+- **Rejected**: Department receives **only** auto-critical: `Allocation_d = Critical_d` (mandatory Step 0 still applies); **no** discretionary debit for that department’s rejected ask
+- Voting is therefore about **growth funding**, not survival
 
 ---
 
 ## Rejection Consequences
 
-- No treasury change for rejected proposals
-- Department receives zero allocation for that proposal round
-- Rejected proposals cannot be resubmitted in the same round
-- Department must wait until next round to request again
+- Auto-critical debits still apply to all departments when solvent
+- Rejected discretionary: department stays at **critical-only** funding; treasury is **not** debited for the rejected discretionary portion
+- Rejected proposals cannot be resubmitted in the same round (unless a retry / reopen flow is used by the environment wrapper)
+- Department may propose again next round
 
 ---
 
@@ -130,13 +128,12 @@
   - Later proposals exceeding remaining balance are auto-rejected
   - This creates strategic pressure around proposal ordering
 
-### All Ministers Abstain from Proposing
+### All ministers propose zero discretionary
 
-- Game proceeds to voting phase
-- No proposals to vote on
-- Round continues to Phase 5 and beyond
+- Every department still receives auto-critical in Phase 5
+- Shutdown counter may advance if `sum(Discretionary_d) = 0` for consecutive rounds (see Turn Structure)
 
-### Single Minister Remaining (all others abstained)
+### Single Minister Remaining (edge case)
 
 - If only one minister proposes and all others abstain from voting:
   - Their proposal requires YES votes from all non-abstaining (the single voter)
@@ -155,7 +152,7 @@
 | Proposal exceeds treasury | REJECTED (auto, before voting) |
 | Late submission | INVALID (ignored) |
 | Minister abstains from voting | Not counted toward majority |
-| Minister abstains from proposing | No proposal submitted |
+| Minister proposes 0 discretionary | Auto-critical only if approved path allows |
 
 ---
 

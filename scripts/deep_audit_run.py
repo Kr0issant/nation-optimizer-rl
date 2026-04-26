@@ -71,15 +71,21 @@ def run_labeled_trial(rounds=10):
             print("---------------------------\n", flush=True)
 
         if done:
-            if info.get("termination_reason") == "CRITICAL_FAILURE":
-                print("ROOT CAUSE ANALYSIS:")
+            if info.get("termination_reason") == "BANKRUPTCY":
+                print("ROOT CAUSE ANALYSIS (treasury could not cover mandatory spend):")
                 for name, sector in env.game.sectors.items():
                     crit_val = sector.critical(obs.population)
                     demand_val = float(sector.demand)
                     if sector.allocation < crit_val:
-                        print(f"  [!] Sector '{name}' COLLAPSED: Allocation ${sector.allocation:.2f} < Critical ${crit_val:.2f}")
+                        print(
+                            f"  [!] Sector '{name}' below critical: "
+                            f"Allocation ${sector.allocation:.2f} < Critical ${crit_val:.2f}"
+                        )
                     elif sector.allocation < demand_val:
-                        print(f"  [-] Sector '{name}' under-funded: Allocation ${sector.allocation:.2f} < Demand ${demand_val:.2f}")
+                        print(
+                            f"  [-] Sector '{name}' under-funded: "
+                            f"Allocation ${sector.allocation:.2f} < Demand ${demand_val:.2f}"
+                        )
             print(f"\nSIMULATION ENDED. Reason: {info.get('termination_reason')}")
             break
 
