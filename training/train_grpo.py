@@ -93,10 +93,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-push", action="store_true", help="Disable push_to_hub.")
     parser.add_argument("--max-steps", type=int, default=500)
     parser.add_argument("--learning-rate", type=float, default=5e-6)
-    parser.add_argument("--per-device-batch-size", type=int, default=4)
-    parser.add_argument("--num-generations", type=int, default=4)
-    parser.add_argument("--max-prompt-length", type=int, default=2048)
-    parser.add_argument("--max-completion-length", type=int, default=256)
+    parser.add_argument("--per-device-batch-size", type=int, default=8)
+    parser.add_argument("--num-generations", type=int, default=8)
+    parser.add_argument("--max-prompt-length", type=int, default=512)
+    parser.add_argument("--max-completion-length", type=int, default=512)
     parser.add_argument("--beta", type=float, default=0.04)
     parser.add_argument("--bf16", action="store_true", default=True)
     parser.add_argument("--no-bf16", dest="bf16", action="store_false")
@@ -165,10 +165,10 @@ def apply_smoke_overrides(cfg: TrainArgs) -> TrainArgs:
         push_to_hub=False,
         max_steps=5,
         learning_rate=cfg.learning_rate,
-        per_device_batch_size=1,
-        num_generations=2,
-        max_prompt_length=512,
-        max_completion_length=64,
+        per_device_batch_size=2,
+        num_generations=4,
+        max_prompt_length=256,
+        max_completion_length=128,
         beta=cfg.beta,
         bf16=False,
         fp16=False,
