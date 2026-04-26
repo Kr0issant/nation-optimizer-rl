@@ -16,9 +16,10 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Copy python dependency files
-COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev
+# Install deps from pyproject only. (Do not require uv.lock in the build context —
+# some hosts e.g. HF Spaces can omit it; lock is generated during `uv lock`.)
+COPY pyproject.toml README.md ./
+RUN uv lock && uv sync --frozen --no-dev
 
 # Copy the game engine and server code
 COPY agents ./agents
