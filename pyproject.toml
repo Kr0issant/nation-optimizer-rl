@@ -31,6 +31,7 @@ training = [
     "accelerate>=0.34",
     "bitsandbytes>=0.43; platform_system != 'Windows'",
     "datasets>=2.20",
+    "matplotlib>=3.8",
     "peft>=0.12",
     "trackio>=0.1",
     "transformers>=4.44",

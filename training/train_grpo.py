@@ -38,22 +38,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# Debug: show where we are and what we see
-print(f"DEBUG: CWD={os.getcwd()}")
-print(f"DEBUG: Files in CWD={os.listdir('.')}")
-print(f"DEBUG: __file__={__file__}")
-
 # Ensure project root is in sys.path for HF Jobs
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
-print(f"DEBUG: sys.path={sys.path}")
+
+if os.environ.get("NATION_TRAIN_DEBUG", "").lower() in ("1", "true", "yes"):
+    print(f"DEBUG: CWD={os.getcwd()}", file=sys.stderr)
+    print(f"DEBUG: __file__={__file__}", file=sys.stderr)
+    print(f"DEBUG: sys.path={sys.path}", file=sys.stderr)
 
 
 DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 # Regenerate with `python -m scripts.collect_grpo_prompts` after game/economy changes.
-DEFAULT_DATASET_ID = "nation-optimizer/nation-parliamentary-prompts"
-DEFAULT_HUB_MODEL_ID = "nation-optimizer/nation-parliamentary-grpo-lora"
+# Dataset and model repo ids use NATION_HF_USER (default Hugging Face account for
+# this project). A Space may be published on a *community* HF account; that is not a
+# writable model/dataset namespace. Set NATION_HF_USER to the output of `hf auth
+# whoami` (or an org you own).
+_NATION_HF_USER = os.environ.get("NATION_HF_USER", "abanwild")
+DEFAULT_DATASET_ID = f"{_NATION_HF_USER}/nation-parliamentary-prompts"
+DEFAULT_HUB_MODEL_ID = f"{_NATION_HF_USER}/nation-parliamentary-grpo-lora"
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +80,7 @@ class TrainArgs:
     smoke: bool
     seed: int
     report_to: str
+    plot_path: str | None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -111,6 +116,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="trackio",
         help="Pass to TrainingArguments.report_to; use 'none' to disable.",
     )
+    parser.add_argument(
+        "--plot-path",
+        default=None,
+        help=(
+            "If set, save loss/reward subplots to this path (PNG) after training "
+            "using trainer.state.log_history. Works offline; requires matplotlib."
+        ),
+    )
     return parser
 
 
@@ -135,6 +148,7 @@ def parse_args(argv: list[str] | None = None) -> TrainArgs:
         smoke=args.smoke,
         seed=args.seed,
         report_to=args.report_to,
+        plot_path=args.plot_path,
     )
 
 
@@ -161,31 +175,85 @@ def apply_smoke_overrides(cfg: TrainArgs) -> TrainArgs:
         smoke=True,
         seed=cfg.seed,
         report_to="none",
+        plot_path=cfg.plot_path,
     )
 
 
-def main(argv: list[str] | None = None) -> int:
-    cfg = apply_smoke_overrides(parse_args(argv))
+def _save_training_curves_plot(trainer: Any, out_path: str) -> None:
+    """Write loss + reward series from the Trainer log history to a PNG file."""
+    import matplotlib
 
-    try:
-        from datasets import load_dataset
-        from peft import LoraConfig
-        from trl import GRPOConfig, GRPOTrainer
-    except ImportError as exc:  # pragma: no cover - exercised on real GPUs only
-        print(
-            "Missing training extras. Install with: "
-            "pip install -e '.[training]' "
-            f"(import error: {exc})",
-            file=sys.stderr,
-        )
-        return 2
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    history: list[dict[str, float]] = getattr(trainer.state, "log_history", None) or []
+    if not history:
+        print("[train_grpo] No log_history; skip --plot-path.", file=sys.stderr)
+        return
+
+    from collections import defaultdict
+
+    series: dict[str, list[tuple[int, float]]] = defaultdict(list)
+    for i, entry in enumerate(history):
+        for key, value in entry.items():
+            if not isinstance(value, (int, float)) or "runtime" in str(key).lower():
+                continue
+            if str(key) in ("step", "epoch"):
+                continue
+            series[key].append((i, float(value)))
+
+    if not series:
+        print("[train_grpo] log_history has no plottable scalars; skip --plot-path.", file=sys.stderr)
+        return
+
+    loss_names = [k for k in series if "loss" in k.lower() and "reward" not in k.lower()]
+    reward_names = [k for k in series if "reward" in k.lower()]
+    all_keys = list(series.keys())
+    first_loss = loss_names[0] if loss_names else next((k for k in all_keys if "reward" not in k.lower()), all_keys[0])
+    first_reward = reward_names[0] if reward_names else next(
+        (k for k in all_keys if k != first_loss),
+        first_loss,
+    )
+
+    def _y(name: str) -> list[float]:
+        return [v for _, v in series[name]]
+
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(12, 4))
+    ys0 = _y(first_loss)
+    ax0.plot(range(len(ys0)), ys0, label=first_loss)
+    ax0.set_title("Loss (or first objective metric)")
+    ax0.set_xlabel("log index")
+    ax0.legend(loc="best")
+    ax0.grid(True, alpha=0.3)
+
+    ys1 = _y(first_reward)
+    ax1.plot(range(len(ys1)), ys1, color="C1", label=first_reward)
+    ax1.set_title("Reward (or second metric)")
+    ax1.set_xlabel("log index")
+    ax1.legend(loc="best")
+    ax1.grid(True, alpha=0.3)
+
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(str(out), dpi=120)
+    plt.close(fig)
+    print(f"[train_grpo] Wrote {out.resolve()}", file=sys.stderr)
+
+
+def run_grpo_training(cfg: TrainArgs) -> Any:
+    """Run GRPO with LoRA; return the :class:`GRPOTrainer` (after ``train()``)."""
+    from datasets import load_dataset
+    from peft import LoraConfig
+    from trl import GRPOConfig, GRPOTrainer
 
     from training.reward_fn import make_reward_fn
 
     print(
         f"[train_grpo] base={cfg.base_model} dataset={cfg.dataset_id} "
         f"steps={cfg.max_steps} batch={cfg.per_device_batch_size} "
-        f"G={cfg.num_generations} smoke={cfg.smoke}"
+        f"G={cfg.num_generations} smoke={cfg.smoke}",
+        file=sys.stderr,
     )
 
     dataset = load_dataset(cfg.dataset_id, split=cfg.dataset_split)
@@ -230,6 +298,27 @@ def main(argv: list[str] | None = None) -> int:
     trainer.train()
     if cfg.push_to_hub and cfg.hub_model_id:
         trainer.push_to_hub()
+    if cfg.plot_path:
+        _save_training_curves_plot(trainer, cfg.plot_path)
+    return trainer
+
+
+def main(argv: list[str] | None = None) -> int:
+    cfg = apply_smoke_overrides(parse_args(argv))
+
+    try:
+        import datasets  # noqa: F401
+        import peft  # noqa: F401
+        import trl  # noqa: F401
+    except ImportError as exc:  # pragma: no cover - exercised on real GPUs only
+        print(
+            "Missing training extras. Install with: "
+            "pip install -e '.[training]' "
+            f"(import error: {exc})",
+            file=sys.stderr,
+        )
+        return 2
+    run_grpo_training(cfg)
     return 0
 
 

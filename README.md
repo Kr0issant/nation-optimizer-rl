@@ -138,7 +138,7 @@ The complete game design is documented in the [`specification/`](specification/)
 
 1.  **Clone and Install**:
     ```bash
-    git clone https://github.com/Kr0issant/communism-optimizer-rl.git
+    git clone https://github.com/Kr0issan/communism-optimizer-rl.git
     cd communism-optimizer-rl
     uv sync --extra dev --extra viz --extra training
     ```
@@ -207,19 +207,33 @@ The parliamentary minister adapter is fine-tuned with TRL's `GRPOTrainer` on top
 
 The reward function in [`training/reward_fn.py`](training/reward_fn.py) is dense and grounded in the engine's own piecewise revenue curve from [`core/revenue.py`](core/revenue.py): proposals are scored against their sector's `(critical, demand, surplus)` thresholds, votes are scored by the revenue factor of the proposed allocation, and parsing/legality failures are penalised explicitly.
 
-- **Trained LoRA on the Hub:** [`nation-optimizer/nation-parliamentary-grpo-lora`](https://huggingface.co/nation-optimizer/nation-parliamentary-grpo-lora)
-- **Prompt dataset:** [`nation-optimizer/nation-parliamentary-prompts`](https://huggingface.co/datasets/nation-optimizer/nation-parliamentary-prompts)
-- **Trackio training curves:** [`nation-optimizer/grpo-parliamentary`](https://huggingface.co/spaces/nation-optimizer/grpo-parliamentary) (loss + mean reward per step)
+Hugging Face may show a Space under a **community** team (for example [`ascentftw/nation_optimizer`](https://huggingface.co/spaces/ascentftw/nation_optimizer)) for discoverability. That is **not** the same as *your* writable namespace for **models** and **datasets**: you cannot push training artifacts to “the community” profile. Use the account from `hf auth whoami`, or set **`NATION_HF_USER`** to that name (defaults in code use `abanwild/...` for the Hugging Face default; the upstream Git clone URL may use a different GitHub username).
+
+- **Example Space (community / demo):** [`ascentftw/nation_optimizer`](https://huggingface.co/spaces/ascentftw/nation_optimizer)
+- **Your LoRA (after you push to *your* user):** `https://huggingface.co/${NATION_HF_USER}/nation-parliamentary-grpo-lora`
+- **Your prompt dataset (after you push):** `https://huggingface.co/datasets/${NATION_HF_USER}/nation-parliamentary-prompts`
+- **Trackio (optional):** set `--report-to trackio` on training to publish curves; or use `--plot-path` for local PNGs
 
 ### Reproduce the run
 
-Collect prompts and push them to the Hub:
+**Google Colab (uv + full TRL loop):** open [`notebooks/colab_grpo_training.ipynb`](https://colab.research.google.com/github/Kr0issan/communism-optimizer-rl/blob/main/notebooks/colab_grpo_training.ipynb) — installs the repo with `uv sync --extra training`, runs the OpenEnv smoke check, then `training/train_grpo.py` (loss/reward plot via `--plot-path`).
+
+Create the **Hugging Face Dataset** (this is a `datasets/…` repo, not your Space) and upload it in one go. You must be logged in (`huggingface-cli login` / `hf auth login`, or set `HF_TOKEN` with write access to the target namespace/organization).
 
 ```bash
-uv run python -m scripts.collect_grpo_prompts \
+export NATION_HF_USER="$(hf auth whoami 2>/dev/null || echo abanwild)"
+uv run --extra training python -m scripts.collect_grpo_prompts \
     --seeds 50 --max-rounds 12 \
     --output assets/datasets/grpo_prompts.jsonl \
-    --push-to-hub nation-optimizer/nation-parliamentary-prompts
+    --push-to-hub "${NATION_HF_USER}/nation-parliamentary-prompts" \
+    --public
+```
+
+You must be allowed to create repos under the namespace in `--push-to-hub` (your personal user or an org that granted you write access). Pushing to another user or org (including `nation-optimizer` if you are not a member) returns **403**. The JSONL is large (~hundreds of MB at 50 seeds); it is not committed (`*.jsonl` is gitignored). To **re-upload** an existing file without re-running rollouts:
+
+```bash
+export NATION_HF_USER="$(hf auth whoami 2>/dev/null || echo abanwild)"
+uv run --extra training python -c "import os; from pathlib import Path; from scripts.collect_grpo_prompts import push_to_hub; u=os.environ.get('NATION_HF_USER','abanwild'); push_to_hub(Path('assets/datasets/grpo_prompts.jsonl'), f'{u}/nation-parliamentary-prompts', private=False)"
 ```
 
 Train on Hugging Face Jobs (GRPO + LoRA, ~$5 on `a10g-small`):
@@ -227,15 +241,14 @@ Train on Hugging Face Jobs (GRPO + LoRA, ~$5 on `a10g-small`):
 ```bash
 hf jobs uv run --flavor a10g-small --secrets HF_TOKEN \
     training/train_grpo.py \
-    --dataset-id nation-optimizer/nation-parliamentary-prompts \
-    --hub-model-id nation-optimizer/nation-parliamentary-grpo-lora
+    --dataset-id "${NATION_HF_USER}/nation-parliamentary-prompts" \
+    --hub-model-id "${NATION_HF_USER}/nation-parliamentary-grpo-lora"
 ```
 
-Locally, the same script runs in `--smoke` mode (5 GRPO steps, batch 1, no Hub push) to prove the pipeline imports and the reward function scores real generations:
+Locally, the same script runs in `--smoke` mode (5 GRPO steps, batch 1, no Hub push) to prove the pipeline imports and the reward function scores real generations (requires the prompt dataset to exist on the Hub or use `--dataset-id` for any repo you can read):
 
 ```bash
-uv run --extra training python training/train_grpo.py --smoke \
-    --dataset-id nation-optimizer/nation-parliamentary-prompts
+uv run --extra training python training/train_grpo.py --smoke
 ```
 
 ### Before-vs-after evidence

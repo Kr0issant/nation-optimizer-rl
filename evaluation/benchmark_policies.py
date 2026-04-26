@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import argparse
 import json
 from collections.abc import Callable, Iterable
@@ -31,7 +33,8 @@ DEFAULT_SEEDS = (1, 2, 3)
 DEFAULT_MAX_ROUNDS = 3
 DEFAULT_OUTPUT_PATH = Path("assets/results/benchmark_summary.json")
 DEFAULT_BASE_LLM_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
-DEFAULT_GRPO_LORA_REPO = "nation-optimizer/nation-parliamentary-grpo-lora"
+_DEFAULT_HF = os.environ.get("NATION_HF_USER", "abanwild")
+DEFAULT_GRPO_LORA_REPO = f"{_DEFAULT_HF}/nation-parliamentary-grpo-lora"
 
 AdapterFactory = Callable[[int], PolicyAdapter]
 
