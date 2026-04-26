@@ -274,7 +274,6 @@ def run_grpo_training(cfg: TrainArgs) -> Any:
         learning_rate=cfg.learning_rate,
         per_device_train_batch_size=cfg.per_device_batch_size,
         num_generations=cfg.num_generations,
-        max_prompt_length=cfg.max_prompt_length,
         max_completion_length=cfg.max_completion_length,
         max_steps=cfg.max_steps,
         logging_steps=1 if cfg.smoke else 10,
